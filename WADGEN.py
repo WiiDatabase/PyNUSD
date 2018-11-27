@@ -536,7 +536,7 @@ class WAD:
         pos = self.hdr.hdrsize
 
         # Certificates (always 3)
-        # Order is: CA (Root) + CP + XS
+        # Order is: CA + CP + XS
         # TODO: Check vailidity of certs (+ dev certs)
         pos += utils.align_pointer(pos)
         self.certificates = []
@@ -548,14 +548,14 @@ class WAD:
         pos += utils.align_pointer(pos)
         self.ticket = Ticket(file[pos:pos + self.hdr.ticketsize])
         self.ticket.certificates.append(self.certificates[2])  # XS
-        self.ticket.certificates.append(self.certificates[0])  # Root
+        self.ticket.certificates.append(self.certificates[0])  # CA
         pos += self.hdr.ticketsize
 
         # TMD
         pos += utils.align_pointer(pos)
         self.tmd = TMD(file[pos:pos + self.hdr.tmdsize])
         self.tmd.certificates.append(self.certificates[1])  # CP
-        self.tmd.certificates.append(self.certificates[0])  # Root
+        self.tmd.certificates.append(self.certificates[0])  # CA
         pos += self.hdr.tmdsize
 
         # Contents
@@ -655,21 +655,21 @@ class WADMaker:
             self.footer = b""
         self.contents = []
 
-        # Order of Certs in the WAD: Root Cert, TMD Cert, Cetk Cert (Root + CP + XS)
-        # Take the root cert from ticket (can also be taken from the TMD)
-        root_cert = self.ticket.certificates[1]
-        if root_cert.get_name() != "CA00000001" and root_cert.get_name() != "CA00000002":
-            raise Exception("Root Certificate not found")
+        # Order of Certs in the WAD: CA Cert, TMD Cert, Cetk Cert (CA + CP + XS)
+        # Take the CA cert from ticket (can also be taken from the TMD)
+        ca_cert = self.ticket.certificates[1]
+        if ca_cert.get_name() != "CA00000001" and ca_cert.get_name() != "CA00000002":
+            print("WARNING: Second ticket certificate is {0}, but should be CA Cert".format(ca_cert.get_name()))
 
         tmd_cert = self.tmd.certificates[0]
         if tmd_cert.get_name() != "CP00000004":
-            raise Exception("TMD Certificate not found")
+            print("WARNING: TMD Certificate is {0}, but should be CP Cert".format(tmd_cert.get_name()))
 
         cetk_cert = self.ticket.certificates[0]
         if cetk_cert.get_name() != "XS00000003" and cetk_cert.get_name() != "XS00000006":
-            raise Exception("Cetk Certificate not found")
+            print("WARNING: Ticket Certificate is {0}, but should be XS Cert".format(cetk_cert.get_name()))
 
-        self.certchain = root_cert.pack() + tmd_cert.pack() + cetk_cert.pack()
+        self.certchain = ca_cert.pack() + tmd_cert.pack() + cetk_cert.pack()
 
         # WAD Header
         self.hdr = self.WADHeader()
