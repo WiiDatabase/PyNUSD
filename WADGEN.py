@@ -3,7 +3,6 @@ import binascii
 import os
 import struct
 
-from Crypto.Cipher import AES
 from requests import get, HTTPError
 
 import utils
@@ -433,9 +432,11 @@ class Ticket:
             self.certificates.append(Certificate(file[pos:]))
 
         # Decrypt title key
-        self.decrypted_titlekey = AES.new(key=self.get_decryption_key(),
-                                          mode=AES.MODE_CBC,
-                                          iv=self.titleiv).decrypt(self.hdr.titlekey)
+        self.decrypted_titlekey = utils.Crypto.decrypt_titlekey(
+            commonkey=self.get_decryption_key(),
+            iv=self.titleiv,
+            titlekey=self.hdr.titlekey
+        )
 
     def get_titleid(self):
         return "{:08X}".format(self.hdr.titleid).zfill(16).lower()

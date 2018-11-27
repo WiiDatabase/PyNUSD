@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import binascii
 import os
+import struct
 from argparse import ArgumentParser
 
 from requests import get, HTTPError
@@ -22,11 +23,25 @@ parser.add_argument(
     help='Do not generate WAD.'
 )
 parser.add_argument(
+    '--decrypt',
+    action='store_true',
+    default=False,
+    dest='decryptcontents',
+    help='Create decrypted contents (*.app).'
+)
+parser.add_argument(
     '--deletecontents',
     action='store_false',
     default=True,
     dest='keepcontents',
     help='Do not keep contents.'
+)
+parser.add_argument(
+    '--nolocaluse',
+    action='store_false',
+    default=True,
+    dest='localuse',
+    help='Don\'t use local files (verifies SHA1 sum).'
 )
 parser.add_argument(
     '--key',
@@ -52,8 +67,8 @@ parser.add_argument(
 arguments = parser.parse_args()
 
 
-def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlekey=None, onlyticket=False,
-         base_url="http://nus.cdn.shop.wii.com/ccs/download"):
+def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localuse=True,
+         keepcontents=True, enc_titlekey=None, onlyticket=False, base_url="http://nus.cdn.shop.wii.com/ccs/download"):
     if len(titleid) != 16:
         print("Title ID must be 16 characters long.")
         return
@@ -77,7 +92,7 @@ def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlek
             print("Title key must be in hexadecimal.")
             return
 
-    if not pack_as_wad and not keepcontents:
+    if not pack_as_wad and not keepcontents and not decryptcontents:
         print("Running with these settings would produce no output.")
         return
 
@@ -132,6 +147,14 @@ def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlek
         cetk.hdr.titleversion = tmd.hdr.titleversion
         cetk.hdr.titlekey = binascii.a2b_hex(enc_titlekey)
         cetk.dump(os.path.join(titlepath, "cetk"))
+        if localuse:  # We need to set Title IV and decrypt the titlekey for verifying
+            cetk.titleiv = struct.pack(">Q", cetk.hdr.titleid) + b"\x00" * 8
+            cetk.decrypted_titlekey = utils.Crypto.decrypt_titlekey(
+                commonkey=cetk.get_decryption_key(),
+                iv=cetk.titleiv,
+                titlekey=cetk.hdr.titlekey
+            )
+
         if onlyticket:
             print("Finished.")
             return
@@ -147,6 +170,10 @@ def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlek
         else:
             cetk.dump(os.path.join(titlepath, "cetk"))
 
+    if decryptcontents and not keepcontents:
+        print("Aborted, because contents should be deleted and decrypting is not possible.")
+        return
+
     # Download Contents
     print("* Downloading Contents...")
     for i, content_url in enumerate(nus.get_content_urls()):
@@ -157,6 +184,23 @@ def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlek
             utils.convert_size(tmd.contents[i].size))
         )
         content_path = os.path.join(titlepath, tmd.contents[i].get_cid())
+
+        # Local Use
+        if localuse and cetk:
+            if os.path.exists(content_path):
+                tmdcontent = tmd.contents[i]
+                iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
+                with open(content_path, "rb") as content_file:
+                    decdata = utils.Crypto.decrypt_data(cetk.decrypted_titlekey, iv, content_file.read(), True)
+                    decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
+                    decdata_hash = utils.Crypto.create_sha1hash(decdata)
+                    tmd_hash = tmdcontent.sha1
+                if decdata_hash == tmd_hash:
+                    print("      Content exists and has been verified!")
+                    continue
+                else:
+                    print("      Content exists, but hash check failed - redownloading...")
+
         req = get(content_url, stream=True)
         if req.status_code != 200:
             print("      Failed to download content")
@@ -165,6 +209,14 @@ def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlek
             for chunk in req.iter_content(chunk_size=5242880):  # Read in 5 MB chunks
                 if chunk:
                     content_file.write(chunk)
+
+    # Decrypt Contents
+    if decryptcontents:
+        print("* Decrypting Contents...")
+        if not cetk:
+            print("    Ticket unavailable, can't be decrypted.")
+        else:
+            WADGEN.WADMaker(titlepath).decrypt()
 
     # Pack as WAD
     if pack_as_wad:
@@ -194,6 +246,8 @@ if __name__ == "__main__":
         titlever=arguments.titleversion,
         pack_as_wad=arguments.pack_as_wad,
         keepcontents=arguments.keepcontents,
+        decryptcontents=arguments.decryptcontents,
+        localuse=arguments.localuse,
         enc_titlekey=arguments.encrypted_key,
         onlyticket=arguments.onlyticket,
         base_url=arguments.base_url

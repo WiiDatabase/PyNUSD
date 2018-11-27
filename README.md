@@ -23,17 +23,19 @@ optional arguments:
   --onlyticket         Only create the ticket, don't store anything.
 ```
 
-## Notes
+## WADGEN Notes
 * Creates valid WADs which are nearly the same as the one from Discs (only missing the footer)
 * Doesn't modify the original TMD and contents like NUSD
-* WADGEN can be used independently
+* Can fix WADs with wrong common key index and wrong certificate chain
+* Can be used independently
   
 ## TODO
 - [ ] More Error handling and retrying
 - [ ] Improve error handling in WADGEN, especially for certificates and too short tmds/tickets
-- [ ] Support for decrypting & SHA1 verify
-- [ ] uselocal parameter (needs SHA1 verifying)
-- [ ] GUI
+- [X] Support for decrypting
+- [X] SHA1 verify
+- [X] uselocal parameter (needs decrypting & SHA1 verifying)
+- [ ] GUI?
   
 ## Credits
 * Daeken for original Struct.py

@@ -30,6 +30,11 @@ class Crypto:
             return AES.new(key, AES.MODE_CBC, iv).encrypt(data)
 
     @classmethod
+    def decrypt_titlekey(cls, commonkey, iv, titlekey):
+        """Decrypts title key from the ticket."""
+        return AES.new(key=commonkey, mode=AES.MODE_CBC, iv=iv).decrypt(titlekey)
+
+    @classmethod
     def create_sha1hash_hex(cls, data):
         return hashlib.sha1(data).hexdigest()
 
