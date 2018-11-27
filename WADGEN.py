@@ -3,6 +3,9 @@ import binascii
 import os
 import struct
 
+from Crypto.Hash import SHA
+from Crypto.PublicKey.RSA import construct
+from Crypto.Signature import PKCS1_v1_5
 from requests import get, HTTPError
 
 import utils
@@ -124,20 +127,28 @@ class Certificate:
         )
         pubkey_length = utils.get_key_length(self.certificate.key_type)
         if pubkey_length == 0x200 + 0x4 + 0x34:
-            self.pubkey = self.PubKeyRSA4096()
+            self.pubkey_struct = self.PubKeyRSA4096()
         elif pubkey_length == 0x100 + 0x4 + 0x34:
-            self.pubkey = self.PubKeyRSA2048()
+            self.pubkey_struct = self.PubKeyRSA2048()
         elif pubkey_length == 0x3C + 0x3C:
-            self.pubkey = self.PubKeyECC()
+            self.pubkey_struct = self.PubKeyECC()
         else:
             raise Exception("Unknown Public Key type")  # Should never happen
-        self.pubkey = self.pubkey.unpack(
+        self.pubkey_struct = self.pubkey_struct.unpack(
             filebytes[len(self.signature) + len(self.certificate):
                       len(self.signature) + len(self.certificate) + pubkey_length]
         )
+        if pubkey_length != 0x3C + 0x3C:
+            self.pubkey = construct(
+                (int.from_bytes(self.pubkey_struct.modulus, byteorder="big"), self.pubkey_struct.exponent)
+            )
+            self.signer = PKCS1_v1_5.new(self.pubkey)
+        else:
+            self.pubkey = None
+            self.signer = None
 
     def __len__(self):
-        return len(self.signature) + len(self.certificate) + len(self.pubkey)
+        return len(self.signature) + len(self.certificate) + len(self.pubkey_struct)
 
     def __repr__(self):
         return "{0} issued by {1}".format(self.get_name(), self.get_issuer())
@@ -150,7 +161,10 @@ class Certificate:
         return output
 
     def pack(self):
-        return self.signature.pack() + self.certificate.pack() + self.pubkey.pack()
+        return self.signature.pack() + self.signature_pack()
+
+    def signature_pack(self):
+        return self.certificate.pack() + self.pubkey_struct.pack()
 
     def get_issuer(self):
         return self.certificate.issuer.rstrip(b"\00").decode().split("-")[-1]
@@ -347,7 +361,12 @@ class TMD:
 
     def pack(self):
         """Returns TMD WITHOUT certificates."""
-        pack = self.signature.pack() + self.hdr.pack()
+        pack = self.signature.pack()
+        return self.signature.pack() + self.signature_pack()
+
+    def signature_pack(self):
+        """Returns TMD only with body (the part that is signed)."""
+        pack = self.hdr.pack()
         for content in self.contents:
             pack += content.pack()
         return pack
