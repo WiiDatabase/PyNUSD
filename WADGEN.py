@@ -70,9 +70,9 @@ class Signature:
 
     def get_signature_type(self):
         if self.signature_length == 0x200 + 0x3C:
-            return "RSA_4096 SHA1"
+            return "RSA-4096 SHA1"
         elif self.signature_length == 0x100 + 0x3C:
-            return "RSA_2048 SHA1"
+            return "RSA-2048 SHA1"
         elif self.signature_length == 0x3C + 0x40:
             return "ECC"
         else:
@@ -142,6 +142,13 @@ class Certificate:
     def __repr__(self):
         return "{0} issued by {1}".format(self.get_name(), self.get_issuer())
 
+    def __str__(self):
+        output = "Certificate:\n"
+        output += "  {0} ({1})\n".format(self.get_name(), self.get_key_type())
+        output += "  Signed by {0} using {1}".format(self.get_issuer(), self.signature.get_signature_type())
+
+        return output
+
     def pack(self):
         return self.signature.pack() + self.certificate.pack() + self.pubkey.pack()
 
@@ -150,6 +157,18 @@ class Certificate:
 
     def get_name(self):
         return self.certificate.name.rstrip(b"\00").decode()
+
+    def get_key_type(self):
+        # https://www.3dbrew.org/wiki/Certificates#Public_Key
+        key_types = [
+            "RSA-4096",
+            "RSA-2048",
+            "Elliptic Curve"
+        ]
+        try:
+            return key_types[self.certificate.key_type]
+        except IndexError:
+            return "Invalid key type"
 
 
 class TMD:

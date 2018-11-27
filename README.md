@@ -37,7 +37,7 @@ optional arguments:
   
 ## Credits
 * Daeken for original Struct.py
-* [grp](https://github.com/grp) for Wii.py)
+* [grp](https://github.com/grp) for Wii.py
 
 ## Screenshots
 ![Screenshot](screenshot.png?raw=true)
