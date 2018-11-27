@@ -595,12 +595,13 @@ class WAD:
             filename = self.tmd.contents[num].get_cid()
             with open(os.path.join(output, filename), "wb") as content_file:
                 if decrypt:  # Decrypted Contents
+                    tmdcontent = self.tmd.contents[num]
                     with open(os.path.join(output, filename + ".app"), "wb") as decrypted_content_file:
-                        iv = struct.pack(">H", self.tmd.contents[num].index) + b"\x00" * 14
+                        iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
                         decdata = utils.Crypto.decrypt_data(self.ticket.decrypted_titlekey, iv, content, True)
-                        decdata = decdata[:self.tmd.contents[num].size]  # Trim the file to its real size
+                        decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
                         decdata_hash = utils.Crypto.create_sha1hash(decdata)
-                        tmd_hash = self.tmd.contents[num].sha1
+                        tmd_hash = tmdcontent.sha1
                         if decdata_hash != tmd_hash:
                             print("WARNING: SHA1 Sum mismatch for file {0}".format(filename + ".app"))
                         decrypted_content_file.write(decdata)
@@ -611,9 +612,7 @@ class WAD:
             with open(os.path.join(output, "footer"), "wb") as footer_file:
                 footer_file.write(self.footer)
 
-    def extract(self, **kwargs):
-        # Alias of WAD.unpack()
-        self.unpack(**kwargs)
+    extract = unpack
 
     def __repr__(self):
         return "WAD for Title {titleid} v{titlever}".format(
@@ -650,10 +649,11 @@ class WADMaker:
             self.footersize = Struct.uint32
 
     def __init__(self, directory):
-        self.ticket = Ticket(os.path.join(directory, "cetk"))
-        self.tmd = TMD(os.path.join(directory, "tmd"))
+        self.directory = directory
+        self.ticket = Ticket(os.path.join(self.directory, "cetk"))
+        self.tmd = TMD(os.path.join(self.directory, "tmd"))
         try:
-            with open(os.path.join(directory, "footer"), "rb") as footer_file:
+            with open(os.path.join(self.directory, "footer"), "rb") as footer_file:
                 self.footer = footer_file.read()
         except FileNotFoundError:
             self.footer = b""
@@ -694,7 +694,50 @@ class WADMaker:
 
         # Contents
         for content in self.tmd.contents:
-            self.contents.append(open(os.path.join(directory, content.get_cid()), 'rb'))
+            self.contents.append(open(os.path.join(self.directory, content.get_cid()), 'rb'))
+
+    def decrypt(self):
+        """Decrypts app files"""
+        for num, content in enumerate(self.contents):
+            tmdcontent = self.tmd.contents[num]
+            with open(os.path.join(self.directory, tmdcontent.get_cid() + ".app"), "wb") as decrypted_content_file:
+                iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
+                decdata = utils.Crypto.decrypt_data(self.ticket.decrypted_titlekey, iv, content.read(), True)
+                decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
+                decdata_hash = utils.Crypto.create_sha1hash(decdata)
+                tmd_hash = tmdcontent.sha1
+                if decdata_hash != tmd_hash:
+                    print("WARNING: SHA1 Sum mismatch for file {0}".format(tmdcontent.get_cid() + ".app"))
+                decrypted_content_file.write(decdata)
+
+    def decrypt_file(self, cid):
+        """Decrypts one app file. Returns True if the SHA1 Sum matches."""
+        cid = cid.lower()
+        encfile = os.path.join(self.directory, cid)
+        if not os.path.exists(encfile):
+            raise FileNotFoundError("File does not exist.")
+
+        tmdcontent = None
+        for i, content in enumerate(self.tmd.contents):
+            if content.get_cid() == cid:
+                tmdcontent = content
+                num = i
+                break
+        if not tmdcontent:
+            raise Exception("Content ID was not found in the TMD.")
+
+        with open(encfile + ".app", "wb") as decrypted_content_file:
+            iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
+            decdata = utils.Crypto.decrypt_data(self.ticket.decrypted_titlekey, iv, self.contents[num].read(), True)
+            decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
+            decdata_hash = utils.Crypto.create_sha1hash(decdata)
+            tmd_hash = tmdcontent.sha1
+            decrypted_content_file.write(decdata)
+
+        if decdata_hash != tmd_hash:
+            return False
+        else:
+            return True
 
     def dump(self, output, fixup=False):
         """Dumps WAD to output. Replaces {titleid} and {titleversion} if in filename.
