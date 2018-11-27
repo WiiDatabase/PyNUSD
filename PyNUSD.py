@@ -42,10 +42,18 @@ parser.add_argument(
     dest='onlyticket',
     help='Only create the ticket, don\'t store anything.'
 )
+parser.add_argument(
+    '--base',
+    default="http://nus.cdn.shop.wii.com/ccs/download",
+    type=str,
+    dest='base_url',
+    help='Base URL for CDN download.'
+)
 arguments = parser.parse_args()
 
 
-def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlekey=None, onlyticket=False):
+def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlekey=None, onlyticket=False,
+         base_url="http://nus.cdn.shop.wii.com/ccs/download"):
     if len(titleid) != 16:
         print("Title ID must be 16 characters long.")
         return
@@ -74,7 +82,7 @@ def main(titleid, titlever=None, pack_as_wad=True, keepcontents=True, enc_titlek
         return
 
     titleid = titleid.lower()
-    nus = WADGEN.NUS(titleid, titlever)
+    nus = WADGEN.NUS(titleid, titlever, base=base_url)
 
     if onlyticket:
         print("Generating Ticket for Title {0} v{1}".format(titleid, "[Latest]" if titlever == None else titlever))
@@ -187,5 +195,6 @@ if __name__ == "__main__":
         pack_as_wad=arguments.pack_as_wad,
         keepcontents=arguments.keepcontents,
         enc_titlekey=arguments.encrypted_key,
-        onlyticket=arguments.onlyticket
+        onlyticket=arguments.onlyticket,
+        base_url=arguments.base_url
     )
