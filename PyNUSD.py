@@ -220,13 +220,14 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
 
     # Pack as WAD
     if pack_as_wad:
-        print("* Creating WAD...")
-        wad_path = os.path.join(titlepath, "{0}-v{1}.wad".format(titleid, titlever))
-        WADGEN.WADMaker(titlepath).dump(wad_path)
-        if not os.path.exists(wad_path):
-            print("    WAD creation failed.")
-        else:
-            print("    WAD creation successful: {0}".format(wad_path))
+        if not cetk.get_titleid().startswith("00030"):
+            print("* Creating WAD...")
+            wad_path = os.path.join(titlepath, "{0}-v{1}.wad".format(titleid, titlever))
+            WADGEN.WADMaker(titlepath).dump(wad_path)
+            if not os.path.exists(wad_path):
+                print("    WAD creation failed.")
+            else:
+                print("    WAD creation successful: {0}".format(wad_path))
     else:
         print("Finished.")
 

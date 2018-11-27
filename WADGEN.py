@@ -14,6 +14,7 @@ DECRYPTION_KEYS = [
     b"\x63\xB8\x2B\xB4\xF4\x61\x4E\x2E\x13\xF2\xFE\xFB\xBA\x4C\x9B\x7E",  # Korean Key
     b"\x30\xbf\xc7\x6e\x7c\x19\xaf\xbb\x23\x16\x33\x30\xce\xd7\xc2\x8d"   # vWii Key
 ]
+DSI_KEY = b"\xAF\x1B\xF5\x16\xA8\x07\xD2\x1A\xEA\x45\x98\x4F\x04\x74\x28\x61"  # DSi Key
 
 
 class Signature:
@@ -287,33 +288,62 @@ class TMD:
         return size
 
     def get_type(self):
-        # https://wiibrew.org/wiki/Title_metadata#Example_code_application
-        types = {
-            "00000001": "System",
-            "00010000": "Game",
-            "00010001": "Channel",
-            "00010002": "System Channel",
-            "00010004": "Game Channel",
-            "00010005": "Downloadable Content",
-            "00010008": "Hidden Channel"
-        }
-        try:
-            return types[self.get_titleid()[:8]]
-        except KeyError:
-            return "Unknown"
+        # https://dsibrew.org/wiki/Title_list#System_Codes
+        if self.get_titleid().startswith("00030"):  # DSi
+            types = {
+                "4B": "DSiWare",
+                "48": "DSi System / Channel"
+            }
+            try:
+                return types[self.get_titleid()[8:10].upper()]
+            except KeyError:
+                return "Unknown"
+        else:
+            # https://wiibrew.org/wiki/Title_metadata#Example_code_application
+            types = {
+                "00000001": "System",
+                "00010000": "Game",
+                "00010001": "Channel",
+                "00010002": "System Channel",
+                "00010004": "Game Channel",
+                "00010005": "Downloadable Content",
+                "00010008": "Hidden Channel"
+            }
+            try:
+                return types[self.get_titleid()[:8].upper()]
+            except KeyError:
+                return "Unknown"
 
     def get_region(self):
-        # https://github.com/dnasdw/libwiisharp/blob/master/libWiiSharp/TMD.cs#L34-L37
-        regions = [
-            "Japan",
-            "USA",
-            "Europe",
-            "Free"
-        ]
-        try:
-            return regions[self.hdr.region]
-        except KeyError:
-            return "Unknown"
+        if self.get_titleid().startswith("00030"):  # DSi
+            # https://dsibrew.org/wiki/Title_list#Region_Codes
+            regions = {
+                "41": "Free",
+                "43": "China",
+                "45": "North America",
+                "48": "Belgium / Netherlands",
+                "4A": "Japan",
+                "4B": "Korea",
+                "50": "Europe",
+                "55": "Australia and New Zealand",
+                "56": "Europe"
+            }
+            try:
+                return regions[self.get_titleid()[-2:].upper()]
+            except KeyError:
+                return "Unknown"
+        else:
+            # https://github.com/dnasdw/libwiisharp/blob/master/libWiiSharp/TMD.cs#L34-L37
+            regions = [
+                "Japan",
+                "USA",
+                "Europe",
+                "Free"
+            ]
+            try:
+                return regions[self.hdr.region]
+            except IndexError:
+                return "Unknown"
 
     def pack(self):
         """Returns TMD WITHOUT certificates."""
@@ -444,6 +474,8 @@ class Ticket:
     def get_decryption_key(self):
         # TODO: Debug (RVT) Tickets
         """Returns the appropiate Common Key"""
+        if self.get_titleid().startswith("00030"):
+            return DSI_KEY
         try:
             return DECRYPTION_KEYS[self.hdr.ckeyindex]
         except IndexError:
@@ -451,6 +483,8 @@ class Ticket:
             return DECRYPTION_KEYS[0]
 
     def get_common_key_type(self):
+        if self.get_titleid().startswith("00030"):
+            return "DSi"
         key_types = [
             "Normal",
             "Korean",
@@ -669,7 +703,7 @@ class WADMaker:
             print("WARNING: Second ticket certificate is {0}, but should be CA Cert".format(ca_cert.get_name()))
 
         tmd_cert = self.tmd.certificates[0]
-        if tmd_cert.get_name() != "CP00000004":
+        if tmd_cert.get_name() != "CP00000004" and tmd_cert.get_name() != "CP00000007":
             self.correct_cert_order = False
             print("WARNING: TMD Certificate is {0}, but should be CP Cert".format(tmd_cert.get_name()))
 
@@ -744,6 +778,9 @@ class WADMaker:
         """Dumps WAD to output. Replaces {titleid} and {titleversion} if in filename.
            Passing "fixup=True"  will repair the common-key index and the certificate chain
         """
+        if self.ticket.get_titleid().startswith("00030"):
+            raise Exception("Can't pack DSi Title as WAD.")
+
         output = output.format(titleid=self.tmd.get_titleid(), titleversion=self.tmd.hdr.titleversion)
 
         if fixup:
@@ -758,7 +795,7 @@ class WADMaker:
                 for cert in self.tmd.certificates + self.ticket.certificates:
                     if cert.get_name() == "CA00000001" or cert.get_name() == "CA00000002":
                         ca_cert = cert
-                    if cert.get_name() == "CP00000004":
+                    if cert.get_name() == "CP00000004" or cert.get_name() == "CP00000007":
                         tmd_cert = cert
                     if cert.get_name() == "XS00000003" or cert.get_name() != "XS00000006":
                         cetk_cert = cert
