@@ -611,6 +611,10 @@ class WAD:
             with open(os.path.join(output, "footer"), "wb") as footer_file:
                 footer_file.write(self.footer)
 
+    def extract(self, **kwargs):
+        # Alias of WAD.unpack()
+        self.unpack(**kwargs)
+
     def __repr__(self):
         return "WAD for Title {titleid} v{titlever}".format(
             titleid=self.tmd.get_titleid(),
@@ -658,18 +662,22 @@ class WADMaker:
         # Order of Certs in the WAD: CA Cert, TMD Cert, Cetk Cert (CA + CP + XS)
         # Take the CA cert from ticket (can also be taken from the TMD)
         ca_cert = self.ticket.certificates[1]
+        self.correct_cert_order = True
         if ca_cert.get_name() != "CA00000001" and ca_cert.get_name() != "CA00000002":
+            self.correct_cert_order = False
             print("WARNING: Second ticket certificate is {0}, but should be CA Cert".format(ca_cert.get_name()))
 
         tmd_cert = self.tmd.certificates[0]
         if tmd_cert.get_name() != "CP00000004":
+            self.correct_cert_order = False
             print("WARNING: TMD Certificate is {0}, but should be CP Cert".format(tmd_cert.get_name()))
 
         cetk_cert = self.ticket.certificates[0]
         if cetk_cert.get_name() != "XS00000003" and cetk_cert.get_name() != "XS00000006":
+            self.correct_cert_order = False
             print("WARNING: Ticket Certificate is {0}, but should be XS Cert".format(cetk_cert.get_name()))
 
-        self.certchain = ca_cert.pack() + tmd_cert.pack() + cetk_cert.pack()
+        self.certificates = [ca_cert, tmd_cert, cetk_cert]
 
         # WAD Header
         self.hdr = self.WADHeader()
@@ -678,7 +686,7 @@ class WADMaker:
             self.hdr.type = b"ib\x00\x00"
         else:
             self.hdr.type = b"Is\x00\x00"
-        self.hdr.certchainsize = len(self.certchain)
+        self.hdr.certchainsize = len(b"".join([x.pack() for x in self.certificates]))
         self.hdr.ticketsize = len(self.ticket)
         self.hdr.tmdsize = len(self.tmd)
         self.hdr.datasize = self.tmd.get_content_size()
@@ -688,17 +696,44 @@ class WADMaker:
         for content in self.tmd.contents:
             self.contents.append(open(os.path.join(directory, content.get_cid()), 'rb'))
 
-    def dump(self, output):
-        """Dumps WAD to output. Replaces {titleid} and {titleversion} if in filename."""
+    def dump(self, output, fixup=False):
+        """Dumps WAD to output. Replaces {titleid} and {titleversion} if in filename.
+           Passing "fixup=True"  will repair the common-key index and the certificate chain
+        """
         output = output.format(titleid=self.tmd.get_titleid(), titleversion=self.tmd.hdr.titleversion)
+
+        if fixup:
+            if self.ticket.hdr.ckeyindex > 2:  # Common key index too high
+                print("Fixing Common key index...")
+                self.ticket.hdr.ckeyindex = 0
+            if not self.correct_cert_order:  # Fixup certificate chain
+                print("Fixing Certificate chain...")
+                ca_cert = None
+                tmd_cert = None
+                cetk_cert = None
+                for cert in self.tmd.certificates + self.ticket.certificates:
+                    if cert.get_name() == "CA00000001" or cert.get_name() == "CA00000002":
+                        ca_cert = cert
+                    if cert.get_name() == "CP00000004":
+                        tmd_cert = cert
+                    if cert.get_name() == "XS00000003" or cert.get_name() != "XS00000006":
+                        cetk_cert = cert
+                if not ca_cert:
+                    raise Exception("ERROR: CA Certificate was not found")
+                if not tmd_cert:
+                    raise Exception("ERROR: CP Certificate was not found")
+                if not cetk_cert:
+                    raise Exception("ERROR: XS Certificate was not found")
+                self.certificates = [ca_cert, tmd_cert, cetk_cert]
+                self.hdr.certchainsize = len(b"".join([x.pack() for x in self.certificates]))
 
         # Header
         wad = self.hdr.pack()
         wad += utils.align(len(self.hdr))
 
         # Certificate Chain
-        wad += self.certchain
-        wad += utils.align(len(self.certchain))
+        wad += b"".join([x.pack() for x in self.certificates])
+        wad += utils.align(self.hdr.certchainsize)
 
         # Ticket
         wad += self.ticket.pack()
