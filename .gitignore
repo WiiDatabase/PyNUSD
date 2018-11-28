@@ -6,5 +6,6 @@ src/
 .idea/
 
 # Data
+root-key
 extracted_wads/
 titles/

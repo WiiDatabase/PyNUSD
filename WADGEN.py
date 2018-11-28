@@ -3,7 +3,6 @@ import binascii
 import os
 import struct
 
-from Crypto.Hash import SHA
 from Crypto.PublicKey.RSA import construct
 from Crypto.Signature import PKCS1_v1_5
 from requests import get, HTTPError
@@ -15,7 +14,7 @@ from utils import CachedProperty
 DECRYPTION_KEYS = [
     b"\xEB\xE4\x2A\x22\x5E\x85\x93\xE4\x48\xD9\xC5\x45\x73\x81\xAA\xF7",  # Common Key
     b"\x63\xB8\x2B\xB4\xF4\x61\x4E\x2E\x13\xF2\xFE\xFB\xBA\x4C\x9B\x7E",  # Korean Key
-    b"\x30\xbf\xc7\x6e\x7c\x19\xaf\xbb\x23\x16\x33\x30\xce\xd7\xc2\x8d"   # vWii Key
+    b"\x30\xbf\xc7\x6e\x7c\x19\xaf\xbb\x23\x16\x33\x30\xce\xd7\xc2\x8d"  # vWii Key
 ]
 DSI_KEY = b"\xAF\x1B\xF5\x16\xA8\x07\xD2\x1A\xEA\x45\x98\x4F\x04\x74\x28\x61"  # DSi Key
 
@@ -183,6 +182,58 @@ class Certificate:
             return key_types[self.certificate.key_type]
         except IndexError:
             return "Invalid key type"
+
+
+class RootCertificate:
+    """Represents the Root Certificate
+       Reference: https://www.3dbrew.org/wiki/Certificates
+    """
+
+    class PubKeyRSA4096(Struct):
+        __endian__ = Struct.BE
+
+        def __format__(self):
+            self.modulus = Struct.string(0x200)
+            self.exponent = Struct.uint32
+
+    def __init__(self, file):
+        if isinstance(file, str):  # Load file
+            try:
+                file = open(file, 'rb').read()
+            except FileNotFoundError:
+                raise FileNotFoundError('File not found')
+        self.pubkey_struct = self.PubKeyRSA4096().unpack(file)
+        self.pubkey = construct(
+            (int.from_bytes(self.pubkey_struct.modulus, byteorder="big"), self.pubkey_struct.exponent)
+        )
+        self.signer = PKCS1_v1_5.new(self.pubkey)
+
+    def __len__(self):
+        return len(self.pubkey_struct)
+
+    def __repr__(self):
+        return "Wii Root Certificate"
+
+    def __str__(self):
+        output = "Certificate:\n"
+        output += "  {0} ({1})\n".format(self.get_name(), self.get_key_type())
+
+        return output
+
+    def pack(self):
+        return self.pubkey_struct.pack()
+
+    def get_name(self):
+        return "Root"
+
+    def get_key_type(self):
+        return "RSA-4096"
+
+
+if os.path.exists("root-key"):
+    ROOT_KEY = RootCertificate("root-key")
+else:
+    ROOT_KEY = None
 
 
 class TMD:
@@ -358,6 +409,13 @@ class TMD:
                 return regions[self.hdr.region]
             except IndexError:
                 return "Unknown"
+
+    def get_cr_by_cid(self, cid):
+        """Returns Content Record by CID."""
+        for i, content in enumerate(self.contents):
+            if content.get_cid() == cid.lower():
+                return i
+        raise ValueError("CID {0} not found.".format(cid))
 
     def pack(self):
         """Returns TMD WITHOUT certificates."""
@@ -771,14 +829,8 @@ class WADMaker:
         if not os.path.exists(encfile):
             raise FileNotFoundError("File does not exist.")
 
-        tmdcontent = None
-        for i, content in enumerate(self.tmd.contents):
-            if content.get_cid() == cid:
-                tmdcontent = content
-                num = i
-                break
-        if not tmdcontent:
-            raise Exception("Content ID was not found in the TMD.")
+        num = self.tmd.get_cr_by_cid(cid)
+        tmdcontent = self.tmd.contents[num]
 
         with open(encfile + ".app", "wb") as decrypted_content_file:
             iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
