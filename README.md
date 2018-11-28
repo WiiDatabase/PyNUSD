@@ -20,6 +20,7 @@ It uses the `requests` module, so you'll need to install it with e.g. pip. Based
 * Creates valid WADs which are nearly the same as the one from Discs (only missing the footer)
 * Doesn't modify the original TMD and contents like NUSD
 * Can handle DSi titles (but not pack them obviously)
+* Verifies Signature (place root-key in the same directory)
 * Can fix WADs with wrong common key index and wrong certificate chain
 
 ## Usage

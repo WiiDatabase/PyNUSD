@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-from Crypto.Cipher import AES
 import hashlib
 import math
+
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA
 
 try:
     import asyncio
@@ -17,7 +19,8 @@ class Crypto:
     def decrypt_data(cls, key, iv, data, align_data=True):
         """Decrypts data (aligns to 64 bytes, if needed)."""
         if align_data and (len(data) % cls.blocksize) != 0:
-            return AES.new(key, AES.MODE_CBC, iv).decrypt(data + (b"\x00" * (cls.blocksize - (len(data) % cls.blocksize))))
+            return AES.new(key, AES.MODE_CBC, iv).decrypt(
+                data + (b"\x00" * (cls.blocksize - (len(data) % cls.blocksize))))
         else:
             return AES.new(key, AES.MODE_CBC, iv).decrypt(data)
 
@@ -25,7 +28,8 @@ class Crypto:
     def encrypt_data(cls, key, iv, data, align_data=True):
         """Encrypts data (aligns to 64 bytes, if needed)."""
         if align_data and (len(data) % cls.blocksize) != 0:
-            return AES.new(key, AES.MODE_CBC, iv).encrypt(data + (b"\x00" * (cls.blocksize - (len(data) % cls.blocksize))))
+            return AES.new(key, AES.MODE_CBC, iv).encrypt(
+                data + (b"\x00" * (cls.blocksize - (len(data) % cls.blocksize))))
         else:
             return AES.new(key, AES.MODE_CBC, iv).encrypt(data)
 
@@ -33,6 +37,16 @@ class Crypto:
     def decrypt_titlekey(cls, commonkey, iv, titlekey):
         """Decrypts title key from the ticket."""
         return AES.new(key=commonkey, mode=AES.MODE_CBC, iv=iv).decrypt(titlekey)
+
+    @classmethod
+    def verify_signature(cls, cert, data_to_verify, signature):
+        """Returns True if the data is signed by the signer.
+           Args:
+               cert (Union[Certificate, RootCertificate]): Certificate or Root certificate class
+               data_to_verify (bytes): Data that will be verified (data without signature most of the time)
+               signature (Signature): Valid Signature class of the data
+        """
+        return cert.signer.verify(SHA.new(data_to_verify), signature.signature.data)
 
     @classmethod
     def create_sha1hash_hex(cls, data):

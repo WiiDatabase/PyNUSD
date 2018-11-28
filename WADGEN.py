@@ -223,15 +223,17 @@ class RootCertificate:
     def pack(self):
         return self.pubkey_struct.pack()
 
-    def get_name(self):
+    @staticmethod
+    def get_name():
         return "Root"
 
-    def get_key_type(self):
+    @staticmethod
+    def get_key_type():
         return "RSA-4096"
 
 
 if os.path.exists("root-key"):
-    ROOT_KEY = RootCertificate("root-key")
+    ROOT_KEY = RootCertificate("root-key")  # https://static.hackmii.com/root-key
 else:
     ROOT_KEY = None
 
@@ -338,12 +340,23 @@ class TMD:
             self.certificates.append(Certificate(file[pos:]))
             pos += len(self.certificates[0])
             self.certificates.append(Certificate(file[pos:]))
+        if self.certificates:
+            if len(self.certificates) != 2:
+                raise Exception("Could not locate all Certs!")
 
     def get_titleid(self):
         return "{:08X}".format(self.hdr.titleid).zfill(16).lower()
 
     def get_required_title(self):
         return "{:08X}".format(self.hdr.system_version).zfill(16).lower()
+
+    def get_issuer(self):
+        """Returns list with the certificate chain issuers.
+           There should be exactly three: the last one (CP) signs the TMD,
+           the one before that (CA) signs the CP cert and
+           the first one (Root) signs the CA cert.
+        """
+        return self.hdr.issuer.rstrip(b"\00").decode().split("-")
 
     def get_content_size(self):
         size = 0
@@ -417,6 +430,16 @@ class TMD:
                 return i
         raise ValueError("CID {0} not found.".format(cid))
 
+    def get_cert_by_name(self, name):
+        """Returns certificate by name."""
+        for i, cert in enumerate(self.certificates):
+            if cert.get_name() == name:
+                return i
+        if name == "Root":
+            if ROOT_KEY:
+                return ROOT_KEY
+        raise ValueError("Certificate '{0}' not found.".format(name))
+
     def pack(self):
         """Returns TMD WITHOUT certificates."""
         pack = self.signature.pack()
@@ -481,6 +504,95 @@ class TMD:
             )
             output += binascii.hexlify(content.sha1).decode() + "\n"
 
+        # TODO: Improve this, is a bit complicated to understand and duplicated
+        if self.certificates:
+            output += "\n"
+            output += "  Certificates:\n"
+            try:
+                signs_tmd = self.get_cert_by_name(self.get_issuer()[-1])  # CP
+                signs_cp = self.get_cert_by_name(self.get_issuer()[1])  # CA
+            except ValueError:
+                output += "   Could not locate the needed certificates.\n"
+                return output
+            try:
+                signs_ca = self.get_cert_by_name(self.get_issuer()[0])  # Root
+            except ValueError:
+                signs_ca = None
+
+            # Check TMD signature
+            verified = utils.Crypto.verify_signature(
+                self.certificates[signs_tmd],
+                self.signature_pack(),
+                self.signature
+            )
+            sha1hash = utils.Crypto.create_sha1hash_hex(self.signature_pack())
+            output += "    TMD signed by {0} using {1}: {2} ".format(
+                "-".join(self.get_issuer()),
+                self.certificates[signs_tmd].get_key_type(),
+                sha1hash
+            )
+            if verified:
+                output += "[OK]"
+            else:
+                if sha1hash.startswith("00"):
+                    output += "[FAKESIGNED]"
+                else:
+                    output += "[FAIL]"
+            output += "\n"
+
+            # Check CP signature
+            verified = utils.Crypto.verify_signature(
+                self.certificates[signs_cp],
+                self.certificates[signs_tmd].signature_pack(),
+                self.certificates[signs_tmd].signature
+            )
+            sha1hash = utils.Crypto.create_sha1hash_hex(self.certificates[signs_tmd].signature_pack())
+            output += "    {0} ({1}) signed by {2} ({3}): {4} ".format(
+                self.certificates[signs_tmd].get_name(),
+                self.certificates[signs_tmd].get_key_type(),
+                self.certificates[signs_tmd].get_issuer(),
+                self.certificates[signs_cp].get_key_type(),
+                sha1hash
+            )
+            if verified:
+                output += "[OK]"
+            else:
+                if sha1hash.startswith("00"):
+                    output += "[FAKESIGNED]"
+                else:
+                    output += "[FAIL]"
+            output += "\n"
+
+            # Check Root signature
+            if signs_ca:
+                verified = utils.Crypto.verify_signature(
+                    signs_ca,
+                    self.certificates[signs_cp].signature_pack(),
+                    self.certificates[signs_cp].signature
+                )
+                sha1hash = utils.Crypto.create_sha1hash_hex(self.certificates[signs_cp].signature_pack())
+                output += "    {0} ({1}) signed by {2} ({3}): {4} ".format(
+                    self.certificates[signs_cp].get_name(),
+                    self.certificates[signs_cp].get_key_type(),
+                    self.certificates[signs_cp].get_issuer(),
+                    ROOT_KEY.get_key_type(),
+                    sha1hash
+                )
+                if verified:
+                    output += "[OK]"
+                else:
+                    if sha1hash.startswith("00"):
+                        output += "[FAKESIGNED]"
+                    else:
+                        output += "[FAIL]"
+            else:
+                output += "    {0} ({1}) signed by {2}: Please place root-key in the same directory".format(
+                    self.certificates[signs_cp].get_name(),
+                    self.certificates[signs_cp].get_key_type(),
+                    self.certificates[signs_cp].get_issuer()
+                )
+            output += "\n"
+
         return output
 
 
@@ -537,6 +649,9 @@ class Ticket:
             self.certificates.append(Certificate(file[pos:]))
             pos += len(self.certificates[0])
             self.certificates.append(Certificate(file[pos:]))
+        if self.certificates:
+            if len(self.certificates) != 2:
+                raise Exception("Could not locate all Certs!")
 
         # Decrypt title key
         self.decrypted_titlekey = utils.Crypto.decrypt_titlekey(
@@ -547,6 +662,14 @@ class Ticket:
 
     def get_titleid(self):
         return "{:08X}".format(self.hdr.titleid).zfill(16).lower()
+
+    def get_issuer(self):
+        """Returns list with the certificate chain issuers.
+           There should be exactly three: the last one (XS) signs the Ticket,
+           the one before that (CA) signs the CP cert and
+           the first one (Root) signs the CA cert.
+        """
+        return self.hdr.issuer.rstrip(b"\00").decode().split("-")
 
     def get_decryption_key(self):
         # TODO: Debug (RVT) Tickets
@@ -572,9 +695,23 @@ class Ticket:
         except IndexError:
             return "Unknown"
 
+    def get_cert_by_name(self, name):
+        """Returns certificate by name."""
+        for i, cert in enumerate(self.certificates):
+            if cert.get_name() == name:
+                return i
+        if name == "Root":
+            if ROOT_KEY:
+                return ROOT_KEY
+        raise ValueError("Certificate '{0}' not found.".format(name))
+
     def pack(self):
         """Returns ticket WITHOUT certificates"""
         return self.signature.pack() + self.hdr.pack()
+
+    def signature_pack(self):
+        """Returns Ticket only with body (the part that is signed)."""
+        return self.hdr.pack()
 
     def dump(self, output=None):
         """Dumps ticket to output WITH Certificates. Replaces {titleid} and {titleversion} if in filename.
@@ -611,6 +748,95 @@ class Ticket:
         output += "  Initialization vector: {0}\n".format(binascii.hexlify(self.titleiv).decode())
         output += "  Title key (encrypted): {0}\n".format(binascii.hexlify(self.hdr.titlekey).decode())
         output += "  Title key (decrypted): {0}\n".format(binascii.hexlify(self.decrypted_titlekey).decode())
+
+        # TODO: Improve this, is a bit complicated to understand and duplicated
+        if self.certificates:
+            output += "\n"
+            output += "  Certificates:\n"
+            try:
+                signs_tmd = self.get_cert_by_name(self.get_issuer()[-1])  # CP
+                signs_cp = self.get_cert_by_name(self.get_issuer()[1])  # CA
+            except ValueError:
+                output += "   Could not locate the needed certificates.\n"
+                return output
+            try:
+                signs_ca = self.get_cert_by_name(self.get_issuer()[0])  # Root
+            except ValueError:
+                signs_ca = None
+
+            # Check TMD signature
+            verified = utils.Crypto.verify_signature(
+                self.certificates[signs_tmd],
+                self.signature_pack(),
+                self.signature
+            )
+            sha1hash = utils.Crypto.create_sha1hash_hex(self.signature_pack())
+            output += "    Ticket signed by {0} using {1}: {2} ".format(
+                "-".join(self.get_issuer()),
+                self.certificates[signs_tmd].get_key_type(),
+                sha1hash
+            )
+            if verified:
+                output += "[OK]"
+            else:
+                if sha1hash.startswith("00"):
+                    output += "[FAKESIGNED]"
+                else:
+                    output += "[FAIL]"
+            output += "\n"
+
+            # Check CP signature
+            verified = utils.Crypto.verify_signature(
+                self.certificates[signs_cp],
+                self.certificates[signs_tmd].signature_pack(),
+                self.certificates[signs_tmd].signature
+            )
+            sha1hash = utils.Crypto.create_sha1hash_hex(self.certificates[signs_tmd].signature_pack())
+            output += "    {0} ({1}) signed by {2} ({3}): {4} ".format(
+                self.certificates[signs_tmd].get_name(),
+                self.certificates[signs_tmd].get_key_type(),
+                self.certificates[signs_tmd].get_issuer(),
+                self.certificates[signs_cp].get_key_type(),
+                sha1hash
+            )
+            if verified:
+                output += "[OK]"
+            else:
+                if sha1hash.startswith("00"):
+                    output += "[FAKESIGNED]"
+                else:
+                    output += "[FAIL]"
+            output += "\n"
+
+            # Check Root signature
+            if signs_ca:
+                verified = utils.Crypto.verify_signature(
+                    signs_ca,
+                    self.certificates[signs_cp].signature_pack(),
+                    self.certificates[signs_cp].signature
+                )
+                sha1hash = utils.Crypto.create_sha1hash_hex(self.certificates[signs_cp].signature_pack())
+                output += "    {0} ({1}) signed by {2} ({3}): {4} ".format(
+                    self.certificates[signs_cp].get_name(),
+                    self.certificates[signs_cp].get_key_type(),
+                    self.certificates[signs_cp].get_issuer(),
+                    ROOT_KEY.get_key_type(),
+                    sha1hash
+                )
+                if verified:
+                    output += "[OK]"
+                else:
+                    if sha1hash.startswith("00"):
+                        output += "[FAKESIGNED]"
+                    else:
+                        output += "[FAIL]"
+            else:
+                output += "    {0} ({1}) signed by {2}: Please place root-key in the same directory".format(
+                    self.certificates[signs_cp].get_name(),
+                    self.certificates[signs_cp].get_key_type(),
+                    self.certificates[signs_cp].get_issuer()
+                )
+            output += "\n"
 
         return output
 
