@@ -128,10 +128,10 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         titlever = tmd.hdr.titleversion
     else:
         if titlever != tmd.hdr.titleversion:
-            print("WARNING: Title version should be {0} but is {1}".format(titleid, tmd.hdr.titleversion))
+            print("    WARNING: Title version should be {0} but is {1}".format(titleid, tmd.hdr.titleversion))
 
     if titleid != tmd.get_titleid():
-        print("WARNING: Title ID should be {0} but is {1}".format(titleid, tmd.get_titleid()))
+        print("    WARNING: Title ID should be {0} but is {1} (ignore for vWii)".format(titleid, tmd.get_titleid()))
 
     titlepath = os.path.join("titles", titleid, str(titlever))
     if not os.path.exists(titlepath):
