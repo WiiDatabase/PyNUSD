@@ -971,6 +971,7 @@ class WADMaker:
 
     Args:
         directory (str): Path to dir with cetk + tmd + contents
+        titlever (int): Title Version for TMD (reads tmd.TITLEVER instead of just "tmd")
     """
 
     class WADHeader(Struct):
@@ -986,10 +987,13 @@ class WADMaker:
             self.datasize = Struct.uint32
             self.footersize = Struct.uint32
 
-    def __init__(self, directory):
+    def __init__(self, directory, titlever=None):
         self.directory = directory
         self.ticket = Ticket(os.path.join(self.directory, "cetk"))
-        self.tmd = TMD(os.path.join(self.directory, "tmd"))
+        if titlever:
+            self.tmd = TMD(os.path.join(self.directory, "tmd.{0}".format(titlever)))
+        else:
+            self.tmd = TMD(os.path.join(self.directory, "tmd"))
         try:
             with open(os.path.join(self.directory, "footer"), "rb") as footer_file:
                 self.footer = footer_file.read()

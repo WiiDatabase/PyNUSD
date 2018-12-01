@@ -26,7 +26,8 @@ It uses the `requests` module, so you'll need to install it with e.g. pip. Based
 ## Usage
 ```
 usage: PyNUSD.py [-h] [--nopack] [--decrypt] [--deletecontents] [--nolocaluse]
-                 [--key ENCRYPTED_KEY] [--onlyticket] [--base BASE_URL]
+                 [--key ENCRYPTED_KEY] [--onlyticket] [--cdn]
+                 [--base BASE_URL]
                  titleid [titleversion]
 
 positional arguments:
@@ -35,13 +36,14 @@ positional arguments:
 
 optional arguments:
   -h, --help           show this help message and exit
-  --nopack             Do not generate WAD.
-  --decrypt            Create decrypted contents (*.app).
-  --deletecontents     Do not keep contents.
-  --nolocaluse         Don't use local files (verifies SHA1 sum).
-  --key ENCRYPTED_KEY  Encrypted title key for Ticket generation.
-  --onlyticket         Only create the ticket, don't store anything.
-  --base BASE_URL      Base URL for CDN download.
+  --nopack             Do not generate WAD
+  --decrypt            Create decrypted contents (*.app)
+  --deletecontents     Do not keep contents
+  --nolocaluse         Don't use local files (SHA1 sum verifying)
+  --key ENCRYPTED_KEY  Encrypted title key for Ticket generation
+  --onlyticket         Only create the ticket, don't store anything
+  --cdn                Store contents like on CDN (without version directory)
+  --base BASE_URL      Base URL for CDN download
 ```
   
 ## TODO
@@ -50,8 +52,8 @@ optional arguments:
 - [X] Support for decrypting
 - [X] SHA1 verify
 - [X] uselocal parameter (needs decrypting & SHA1 verifying)
-- [ ] WADMaker: Support TMDs with number (e.g. `tmd.512`)
-- [ ] Add flag for not using version directories, just the TID (like CDN structure)
+- [X] WADMaker: Support TMDs with number (e.g. `tmd.512`)
+- [X] Add flag for not using version directories, just the TID (like CDN structure)
 - [ ] Also verify first time downloaded files
 - [ ] GUI?
   

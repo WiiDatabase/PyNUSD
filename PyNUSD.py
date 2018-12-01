@@ -20,55 +20,62 @@ parser.add_argument(
     action='store_false',
     default=True,
     dest='pack_as_wad',
-    help='Do not generate WAD.'
+    help='Do not generate WAD'
 )
 parser.add_argument(
     '--decrypt',
     action='store_true',
     default=False,
     dest='decryptcontents',
-    help='Create decrypted contents (*.app).'
+    help='Create decrypted contents (*.app)'
 )
 parser.add_argument(
     '--deletecontents',
     action='store_false',
     default=True,
     dest='keepcontents',
-    help='Do not keep contents.'
+    help='Do not keep contents'
 )
 parser.add_argument(
     '--nolocaluse',
     action='store_false',
     default=True,
     dest='localuse',
-    help='Don\'t use local files (verifies SHA1 sum).'
+    help='Don\'t use local files (SHA1 sum verifying)'
 )
 parser.add_argument(
     '--key',
     default=None,
     type=str,
     dest='encrypted_key',
-    help='Encrypted title key for Ticket generation.'
+    help='Encrypted title key for Ticket generation'
 )
 parser.add_argument(
     '--onlyticket',
     action='store_true',
     default=False,
     dest='onlyticket',
-    help='Only create the ticket, don\'t store anything.'
+    help='Only create the ticket, don\'t store anything'
+)
+parser.add_argument(
+    '--cdn',
+    action='store_true',
+    default=False,
+    dest='cdndir',
+    help='Store contents like on CDN (without version directory)'
 )
 parser.add_argument(
     '--base',
     default="http://nus.cdn.shop.wii.com/ccs/download",
     type=str,
     dest='base_url',
-    help='Base URL for CDN download.'
+    help='Base URL for CDN download'
 )
 arguments = parser.parse_args()
 
 
-def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localuse=True,
-         keepcontents=True, enc_titlekey=None, onlyticket=False, base_url="http://nus.cdn.shop.wii.com/ccs/download"):
+def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localuse=True, keepcontents=True,
+         enc_titlekey=None, onlyticket=False, cdndir=False, base_url="http://nus.cdn.shop.wii.com/ccs/download"):
     if len(titleid) != 16:
         print("Title ID must be 16 characters long.")
         return
@@ -133,11 +140,17 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
     if titleid != tmd.get_titleid():
         print("    WARNING: Title ID should be {0} but is {1} (ignore for vWii)".format(titleid, tmd.get_titleid()))
 
-    titlepath = os.path.join("titles", titleid, str(titlever))
+    if cdndir:
+        titlepath = os.path.join("titles", titleid)
+    else:
+        titlepath = os.path.join("titles", titleid, str(titlever))
     if not os.path.exists(titlepath):
         os.makedirs(titlepath)
     if not onlyticket:
-        tmd.dump(os.path.join(titlepath, "tmd"))
+        if cdndir:
+            tmd.dump(os.path.join(titlepath, "tmd.{0}".format(titlever)))
+        else:
+            tmd.dump(os.path.join(titlepath, "tmd"))
 
     # Download Ticket
     if enc_titlekey:
@@ -216,14 +229,20 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         if not cetk:
             print("    Ticket unavailable, can't be decrypted.")
         else:
-            WADGEN.WADMaker(titlepath).decrypt()
+            if cdndir:
+                WADGEN.WADMaker(titlepath, titlever=titlever).decrypt()
+            else:
+                WADGEN.WADMaker(titlepath).decrypt()
 
     # Pack as WAD
     if pack_as_wad:
         if not cetk.get_titleid().startswith("00030"):
             print("* Creating WAD...")
             wad_path = os.path.join(titlepath, "{0}-v{1}.wad".format(titleid, titlever))
-            WADGEN.WADMaker(titlepath).dump(wad_path)
+            if cdndir:
+                WADGEN.WADMaker(titlepath, titlever=titlever).dump(wad_path)
+            else:
+                WADGEN.WADMaker(titlepath).dump(wad_path)
             if not os.path.exists(wad_path):
                 print("    WAD creation failed.")
             else:
@@ -251,5 +270,6 @@ if __name__ == "__main__":
         localuse=arguments.localuse,
         enc_titlekey=arguments.encrypted_key,
         onlyticket=arguments.onlyticket,
+        cdndir=arguments.cdndir,
         base_url=arguments.base_url
     )
