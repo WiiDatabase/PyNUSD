@@ -144,7 +144,7 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         titlepath = os.path.join("titles", titleid)
     else:
         titlepath = os.path.join("titles", titleid, str(titlever))
-    if not os.path.exists(titlepath):
+    if not os.path.isdir(titlepath):
         os.makedirs(titlepath)
     if not onlyticket:
         if cdndir:
@@ -200,7 +200,7 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
 
         # Local Use
         if localuse and cetk:
-            if os.path.exists(content_path):
+            if os.path.isfile(content_path):
                 tmdcontent = tmd.contents[i]
                 iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
                 with open(content_path, "rb") as content_file:
@@ -243,7 +243,7 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
                 WADGEN.WADMaker(titlepath, titlever=titlever).dump(wad_path)
             else:
                 WADGEN.WADMaker(titlepath).dump(wad_path)
-            if not os.path.exists(wad_path):
+            if not os.path.isfile(wad_path):
                 print("    WAD creation failed.")
             else:
                 print("    WAD creation successful: {0}".format(wad_path))

@@ -232,7 +232,7 @@ class RootCertificate:
         return "RSA-4096"
 
 
-if os.path.exists("root-key"):
+if os.path.isfile("root-key"):
     ROOT_KEY = RootCertificate("root-key")  # https://static.hackmii.com/root-key
 else:
     ROOT_KEY = None
@@ -926,7 +926,7 @@ class WAD:
             output = output.format(titleid=self.tmd.get_titleid(), titleversion=self.tmd.hdr.titleversion)
         else:
             output = os.path.join("extracted_wads", self.tmd.get_titleid(), str(self.tmd.hdr.titleversion))
-        if not os.path.exists(output):
+        if not os.path.isdir(output):
             os.makedirs(output)
         # TMD + Ticket
         self.tmd.dump(os.path.join(output, "tmd"))
@@ -1060,7 +1060,7 @@ class WADMaker:
         """Decrypts one app file. Returns True if the SHA1 Sum matches."""
         cid = cid.lower()
         encfile = os.path.join(self.directory, cid)
-        if not os.path.exists(encfile):
+        if not os.path.isfile(encfile):
             raise FileNotFoundError("File does not exist.")
 
         num = self.tmd.get_cr_index_by_cid(cid)
