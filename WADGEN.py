@@ -423,12 +423,16 @@ class TMD:
             except IndexError:
                 return "Unknown"
 
-    def get_cr_by_cid(self, cid):
-        """Returns Content Record by CID."""
+    def get_cr_index_by_cid(self, cid):
+        """Returns Content Record index by CID."""
         for i, content in enumerate(self.contents):
-            if content.get_cid() == cid.lower():
+            if content.get_cid() == cid:
                 return i
         raise ValueError("CID {0} not found.".format(cid))
+
+    def get_cr_by_cid(self, cid):
+        """Returns Content Record by CID."""
+        return self.contents[self.get_cr_index_by_cid(cid)]
 
     def get_cert_by_name(self, name):
         """Returns certificate by name."""
@@ -1059,7 +1063,7 @@ class WADMaker:
         if not os.path.exists(encfile):
             raise FileNotFoundError("File does not exist.")
 
-        num = self.tmd.get_cr_by_cid(cid)
+        num = self.tmd.get_cr_index_by_cid(cid)
         tmdcontent = self.tmd.contents[num]
 
         with open(encfile + ".app", "wb") as decrypted_content_file:
@@ -1208,6 +1212,13 @@ class NUS:
         for content in self.tmd.contents:
             urls.append(self.url + content.get_cid())
         return urls
+
+    def get_content_url_by_cid(self, cid):
+        """Returns content url for content id"""
+        for content in self.tmd.contents:
+            if content.get_cid() == cid.lower():
+                return self.url + content.get_cid()
+        raise Exception("Content ID {0} not in TMD.".format(cid))
 
     def __repr__(self):
         return "Title {id} v{ver} on NUS".format(
