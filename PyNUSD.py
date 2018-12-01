@@ -183,7 +183,7 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         else:
             cetk.dump(os.path.join(titlepath, "cetk"))
 
-    if decryptcontents and not keepcontents:
+    if decryptcontents and not keepcontents and not cetk:
         print("Aborted, because contents should be deleted and decrypting is not possible.")
         return
 
@@ -251,7 +251,10 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         print("Finished.")
 
     if not keepcontents:
-        os.remove(os.path.join(titlepath, "tmd"))
+        if cdndir:
+            os.remove(os.path.join(titlepath, "tmd.{0}".format(titlever)))
+        else:
+            os.remove(os.path.join(titlepath, "tmd"))
         try:
             os.remove(os.path.join(titlepath, "cetk"))
         except FileNotFoundError:
