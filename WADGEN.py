@@ -758,7 +758,7 @@ class Ticket:
             output += "\n"
             output += "  Certificates:\n"
             try:
-                signs_tmd = self.get_cert_by_name(self.get_issuer()[-1])  # CP
+                signs_ticket = self.get_cert_by_name(self.get_issuer()[-1])  # XS
                 signs_cp = self.get_cert_by_name(self.get_issuer()[1])  # CA
             except ValueError:
                 output += "   Could not locate the needed certificates.\n"
@@ -768,16 +768,16 @@ class Ticket:
             except ValueError:
                 signs_ca = None
 
-            # Check TMD signature
+            # Check Ticket signature
             verified = utils.Crypto.verify_signature(
-                self.certificates[signs_tmd],
+                self.certificates[signs_ticket],
                 self.signature_pack(),
                 self.signature
             )
             sha1hash = utils.Crypto.create_sha1hash_hex(self.signature_pack())
             output += "    Ticket signed by {0} using {1}: {2} ".format(
                 "-".join(self.get_issuer()),
-                self.certificates[signs_tmd].get_key_type(),
+                self.certificates[signs_ticket].get_key_type(),
                 sha1hash
             )
             if verified:
@@ -789,17 +789,17 @@ class Ticket:
                     output += "[FAIL]"
             output += "\n"
 
-            # Check CP signature
+            # Check XS signature
             verified = utils.Crypto.verify_signature(
                 self.certificates[signs_cp],
-                self.certificates[signs_tmd].signature_pack(),
-                self.certificates[signs_tmd].signature
+                self.certificates[signs_ticket].signature_pack(),
+                self.certificates[signs_ticket].signature
             )
-            sha1hash = utils.Crypto.create_sha1hash_hex(self.certificates[signs_tmd].signature_pack())
+            sha1hash = utils.Crypto.create_sha1hash_hex(self.certificates[signs_ticket].signature_pack())
             output += "    {0} ({1}) signed by {2} ({3}): {4} ".format(
-                self.certificates[signs_tmd].get_name(),
-                self.certificates[signs_tmd].get_key_type(),
-                self.certificates[signs_tmd].get_issuer(),
+                self.certificates[signs_ticket].get_name(),
+                self.certificates[signs_ticket].get_key_type(),
+                self.certificates[signs_ticket].get_issuer(),
                 self.certificates[signs_cp].get_key_type(),
                 sha1hash
             )
