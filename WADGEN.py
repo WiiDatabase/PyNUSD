@@ -937,14 +937,10 @@ class WAD:
             filename = self.tmd.contents[num].get_cid()
             with open(os.path.join(output, filename), "wb") as content_file:
                 if decrypt:  # Decrypted Contents
-                    tmdcontent = self.tmd.contents[num]
+                    valid, decdata = utils.Crypto.check_content_hash(self.tmd.contents[num], self.ticket, content,
+                                                                     return_decdata=True)
                     with open(os.path.join(output, filename + ".app"), "wb") as decrypted_content_file:
-                        iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
-                        decdata = utils.Crypto.decrypt_data(self.ticket.decrypted_titlekey, iv, content, True)
-                        decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
-                        decdata_hash = utils.Crypto.create_sha1hash(decdata)
-                        tmd_hash = tmdcontent.sha1
-                        if decdata_hash != tmd_hash:
+                        if not valid:
                             print("WARNING: SHA1 Sum mismatch for file {0}".format(filename + ".app"))
                         decrypted_content_file.write(decdata)
                 content_file.write(content)
@@ -1046,13 +1042,10 @@ class WADMaker:
         """Decrypts app files"""
         for num, content in enumerate(self.contents):
             tmdcontent = self.tmd.contents[num]
+            valid, decdata = utils.Crypto.check_content_hash(tmdcontent, self.ticket, content.read(),
+                                                             return_decdata=True)
             with open(os.path.join(self.directory, tmdcontent.get_cid() + ".app"), "wb") as decrypted_content_file:
-                iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
-                decdata = utils.Crypto.decrypt_data(self.ticket.decrypted_titlekey, iv, content.read(), True)
-                decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
-                decdata_hash = utils.Crypto.create_sha1hash(decdata)
-                tmd_hash = tmdcontent.sha1
-                if decdata_hash != tmd_hash:
+                if not valid:
                     print("WARNING: SHA1 Sum mismatch for file {0}".format(tmdcontent.get_cid() + ".app"))
                 decrypted_content_file.write(decdata)
 
@@ -1067,17 +1060,13 @@ class WADMaker:
         tmdcontent = self.tmd.contents[num]
 
         with open(encfile + ".app", "wb") as decrypted_content_file:
-            iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
-            decdata = utils.Crypto.decrypt_data(self.ticket.decrypted_titlekey, iv, self.contents[num].read(), True)
-            decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
-            decdata_hash = utils.Crypto.create_sha1hash(decdata)
-            tmd_hash = tmdcontent.sha1
+            valid, decdata = utils.Crypto.check_content_hash(tmdcontent, self.ticket, self.contents[num].read(),
+                                                             return_decdata=True)
             decrypted_content_file.write(decdata)
-
-        if decdata_hash != tmd_hash:
-            return False
-        else:
+        if valid:
             return True
+        else:
+            return False
 
     def dump(self, output, fixup=False):
         """Dumps WAD to output. Replaces {titleid} and {titleversion} if in filename.

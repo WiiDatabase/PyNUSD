@@ -54,7 +54,7 @@ optional arguments:
 - [X] uselocal parameter (needs decrypting & SHA1 verifying)
 - [X] WADMaker: Support TMDs with number (e.g. `tmd.512`)
 - [X] Add flag for not using version directories, just the TID (like CDN structure)
-- [ ] Also verify first time downloaded files
+- [X] Also verify first time downloaded files
 - [ ] GUI?
   
 ## Credits

@@ -176,10 +176,10 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         cetk = nus.ticket
         if not cetk:
             if pack_as_wad:
-                print("    Ticket unavailable, can't be packed.")
+                print("    Ticket unavailable, can't pack nor verify.")
                 pack_as_wad = False
             else:
-                print("    Ticket unavailable.")
+                print("    Ticket unavailable, can't verify download.")
         else:
             cetk.dump(os.path.join(titlepath, "cetk"))
 
@@ -201,27 +201,26 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         # Local Use
         if localuse and cetk:
             if os.path.isfile(content_path):
-                tmdcontent = tmd.contents[i]
-                iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
                 with open(content_path, "rb") as content_file:
-                    decdata = utils.Crypto.decrypt_data(cetk.decrypted_titlekey, iv, content_file.read(), True)
-                    decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
-                    decdata_hash = utils.Crypto.create_sha1hash(decdata)
-                    tmd_hash = tmdcontent.sha1
-                if decdata_hash == tmd_hash:
-                    print("      Content exists and has been verified!")
-                    continue
-                else:
-                    print("      Content exists, but hash check failed - redownloading...")
+                    if utils.Crypto.check_content_hash(tmd.contents[i], cetk, content_file.read()):
+                        print("      Content exists and has been verified!")
+                        continue
+                    else:
+                        print("      Content exists, but hash check failed - redownloading...")
 
         req = get(content_url, stream=True)
         if req.status_code != 200:
             print("      Failed to download content")
             return
+
+        # Verify after download
+        if cetk:
+            if not utils.Crypto.check_content_hash(tmd.contents[i], cetk, req.content):
+                print("      Hash check failed.")
+                return
+
         with open(content_path, 'wb') as content_file:
-            for chunk in req.iter_content(chunk_size=5242880):  # Read in 5 MB chunks
-                if chunk:
-                    content_file.write(chunk)
+            content_file.write(req.content)
 
     # Decrypt Contents
     if decryptcontents:

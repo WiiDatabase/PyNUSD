@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import hashlib
 import math
+import struct
 
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA
@@ -47,6 +48,31 @@ class Crypto:
                signature (Signature): Valid Signature class of the data
         """
         return cert.signer.verify(SHA.new(data_to_verify), signature.signature.data)
+
+    @classmethod
+    def check_content_hash(cls, tmdcontent, ticket, content, return_decdata=False):
+        """Checks content SHA1 hash against the hash in the TMD. Returns True if hash check passed.
+           Args:
+               tmdcontent (TMD.TMDContent): TMD Content class for the content
+               ticket (Ticket): Ticket class with decrypted titlekey
+               content (bytes): Valid content
+               return_decdata (bool): True -> also returns decrypted data
+        """
+        iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
+        decdata = cls.decrypt_data(ticket.decrypted_titlekey, iv, content, True)
+        decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
+        decdata_hash = cls.create_sha1hash(decdata)
+        tmd_hash = tmdcontent.sha1
+        if decdata_hash == tmd_hash:
+            if return_decdata:
+                return True, decdata
+            else:
+                return True
+        else:
+            if return_decdata:
+                return False, decdata
+            else:
+                return False
 
     @classmethod
     def create_sha1hash_hex(cls, data):
