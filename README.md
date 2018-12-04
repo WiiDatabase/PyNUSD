@@ -11,7 +11,7 @@ It uses the `requests` module, so you'll need to install it with e.g. pip. Based
 * Downloads Wii, vWii and DSi titles from the **N**intendo **U**pdate **S**erver
 * Can decrypt contents and pack them as valid WAD
 * Also accepts encrypted title keys
-* Verifies existing files via SHA1 sum (only for those with ticket)
+* Verifies existing and newly downloaded files via SHA1 sum (only for those with ticket)
 * Supports CDN mirrors through the `--base` parameter
 * Uses my own WADGEN, completely tested, verified and written from scratch
 

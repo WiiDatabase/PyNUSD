@@ -202,9 +202,15 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         if localuse and cetk:
             if os.path.isfile(content_path):
                 with open(content_path, "rb") as content_file:
-                    if utils.Crypto.check_content_hash(tmd.contents[i], cetk, content_file.read()):
+                    valid, decdata = utils.Crypto.check_content_hash(tmd.contents[i], cetk, content_file.read(),
+                                                                     return_decdata=True)
+                    if valid:
                         print("      Content exists and has been verified!")
-                        continue
+                        if decryptcontents:
+                            print("      Decrypting...")
+                            with open(content_path + ".app", "wb") as decrypted_content_file:
+                                decrypted_content_file.write(decdata)
+                        continue  # Go on with the next content
                     else:
                         print("      Content exists, but hash check failed - redownloading...")
 
@@ -215,23 +221,17 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
 
         # Verify after download
         if cetk:
-            if not utils.Crypto.check_content_hash(tmd.contents[i], cetk, req.content):
+            valid, decdata = utils.Crypto.check_content_hash(tmd.contents[i], cetk, req.content, return_decdata=True)
+            if not valid:
                 print("      Hash check failed.")
                 return
+            if decryptcontents:
+                print("      Decrypting...")
+                with open(content_path + ".app", "wb") as decrypted_content_file:
+                    decrypted_content_file.write(decdata)
 
         with open(content_path, 'wb') as content_file:
             content_file.write(req.content)
-
-    # Decrypt Contents
-    if decryptcontents:
-        print("* Decrypting Contents...")
-        if not cetk:
-            print("    Ticket unavailable, can't be decrypted.")
-        else:
-            if cdndir:
-                WADGEN.WADMaker(titlepath, titlever=titlever).decrypt()
-            else:
-                WADGEN.WADMaker(titlepath).decrypt()
 
     # Pack as WAD
     if pack_as_wad:
