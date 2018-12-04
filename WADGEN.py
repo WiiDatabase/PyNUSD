@@ -918,8 +918,37 @@ class WAD:
         else:
             self.footer = None
 
+    def unpack_file(self, cid, output=None, decrypt=False):
+        """"Extracts file from WAD to output directory. Replaces {titleid} and {titleversion} if in folder name.
+            Extracts to "extracted_wads/TITLEID/TITLEVER" if no output is given. Pass decrypt=True to decrypt.
+        """
+        cid = cid.lower()
+        num = self.tmd.get_cr_index_by_cid(cid)
+        tmdcontent = self.tmd.contents[num]
+        content = self.contents[num]
+
+        if output:
+            output = output.format(titleid=self.tmd.get_titleid(), titleversion=self.tmd.hdr.titleversion)
+        else:
+            output = os.path.join("extracted_wads", self.tmd.get_titleid(), str(self.tmd.hdr.titleversion))
+        if not os.path.isdir(output):
+            os.makedirs(output)
+
+        filename = self.tmd.contents[num].get_cid()
+        with open(os.path.join(output, filename), "wb") as content_file:
+            if decrypt:  # Decrypted Contents
+                valid, decdata = utils.Crypto.check_content_hash(tmdcontent, self.ticket, content,
+                                                                 return_decdata=True)
+                if not valid:
+                    print("WARNING: SHA1 Sum mismatch")
+                with open(os.path.join(output, filename + ".app"), "wb") as decrypted_content_file:
+                    decrypted_content_file.write(decdata)
+            content_file.write(content)
+
+    extract_file = unpack_file
+
     def unpack(self, output=None, decrypt=False):
-        """Extracts WAD to output. Replaces {titleid} and {titleversion} if in foldername.
+        """Extracts WAD to output. Replaces {titleid} and {titleversion} if in folder name.
            Extracts to "extracted_wads/TITLEID/TITLEVER" if no output is given. Pass decrypt=True to decrypt contents.
        """
         if output:
@@ -939,9 +968,9 @@ class WAD:
                 if decrypt:  # Decrypted Contents
                     valid, decdata = utils.Crypto.check_content_hash(self.tmd.contents[num], self.ticket, content,
                                                                      return_decdata=True)
+                    if not valid:
+                        print("WARNING: SHA1 Sum mismatch for file {0}".format(filename + ".app"))
                     with open(os.path.join(output, filename + ".app"), "wb") as decrypted_content_file:
-                        if not valid:
-                            print("WARNING: SHA1 Sum mismatch for file {0}".format(filename + ".app"))
                         decrypted_content_file.write(decdata)
                 content_file.write(content)
 
