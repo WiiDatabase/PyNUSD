@@ -2,7 +2,7 @@ PyNUSD
 ========
 This is a **Wii and DSi NUS downloader** written in Python 3(.6). It uses my own [WADGEN](WADGEN.py), completely written from scratch to create WADs from CDN content. PyNUSD can even create tickets from encrypted title keys.
 
-It uses the `requests` module, so you'll need to install it with e.g. pip. Based on [3DS-NUSD](https://github.com/WiiDatabase/3DS-NUSD).
+It uses the `pycryptodome` and `requests` modules, so you'll need to install them with e.g. pip. Based on [3DS-NUSD](https://github.com/WiiDatabase/3DS-NUSD).
 
 "**WADGEN**" can create WADs from cetk + tmd + contents completely in Python. It can also unpack a WAD to its CDN contents, decrypt them, show information and much more!
 
