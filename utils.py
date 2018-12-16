@@ -58,8 +58,7 @@ class Crypto:
                content (bytes): Valid content
                return_decdata (bool): True -> also returns decrypted data
         """
-        iv = struct.pack(">H", tmdcontent.index) + b"\x00" * 14
-        decdata = cls.decrypt_data(ticket.decrypted_titlekey, iv, content, True)
+        decdata = cls.decrypt_data(ticket.decrypted_titlekey, tmdcontent.get_iv(), content, True)
         decdata = decdata[:tmdcontent.size]  # Trim the file to its real size
         decdata_hash = cls.create_sha1hash(decdata)
         tmd_hash = tmdcontent.sha1

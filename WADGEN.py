@@ -284,6 +284,9 @@ class TMD:
         def get_cid(self):
             return ("%08X" % self.cid).lower()
 
+        def get_iv(self):
+            return struct.pack(">H", self.index) + b"\x00" * 14
+
         def get_type(self):
             # https://github.com/dnasdw/libwiisharp/blob/master/libWiiSharp/TMD.cs#L27-L29
             types = {
@@ -1019,6 +1022,7 @@ class WADMaker:
     def __init__(self, directory, titlever=None):
         self.directory = directory
         self.ticket = Ticket(os.path.join(self.directory, "cetk"))
+        self._titlever = titlever
         if titlever:
             self.tmd = TMD(os.path.join(self.directory, "tmd.{0}".format(titlever)))
         else:
@@ -1066,6 +1070,35 @@ class WADMaker:
         # Contents
         for content in self.tmd.contents:
             self.contents.append(open(os.path.join(self.directory, content.get_cid()), 'rb'))
+
+    def encrypt_file(self, cid):
+        """Encrypts one app file and updates the TMD."""
+        cid = cid.lower()
+        encfile = os.path.join(self.directory, cid)
+        decfile = encfile + ".app"
+        if not os.path.isfile(decfile):
+            raise FileNotFoundError("Decrypted APP file does not exist.")
+
+        num = self.tmd.get_cr_index_by_cid(cid)
+        tmdcontent = self.tmd.contents[num]
+
+        with open(decfile, "rb") as decrypted_content_file:
+            decdata = decrypted_content_file.read()
+
+        # Encrypt data
+        encdata = utils.Crypto.encrypt_data(self.ticket.decrypted_titlekey, tmdcontent.get_iv(), decdata)
+        with open(encfile, "wb") as encrypted_content_file:
+            encrypted_content_file.write(encdata)
+
+        # Update TMD
+        tmdcontent.size = len(decdata)
+        tmdcontent.sha1 = utils.Crypto.create_sha1hash(decdata)
+
+        # Dump TMD
+        if self._titlever:
+            self.tmd.dump(os.path.join(self.directory, "tmd.{0}".format(self._titlever)))
+        else:
+            self.tmd.dump(os.path.join(self.directory, "tmd"))
 
     def decrypt(self):
         """Decrypts app files"""
