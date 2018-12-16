@@ -269,7 +269,7 @@ class TMD:
             self.titleversion = Struct.uint16
             self.contentcount = Struct.uint16
             self.bootindex = Struct.uint16
-            self.padding2 = Struct.string(2)
+            self.padding2 = Struct.uint16
 
     class TMDContents(Struct):
         __endian__ = Struct.BE
@@ -446,6 +446,28 @@ class TMD:
             if ROOT_KEY:
                 return ROOT_KEY
         raise ValueError("Certificate '{0}' not found.".format(name))
+
+    def fakesign(self, output=None):
+        """Fakesigns TMD and dumps it. Replaces {titleid} and {titleversion} if in filename.
+           Returns raw binary if no output is given, returns the file path else.
+           https://github.com/FIX94/Some-YAWMM-Mod/blob/e2708863036066c2cc8bad1fc142e90fb8a0464d/source/title.c#L50-L76
+        """
+        # Fill signature with zeroes
+        sigsize = len(self.signature.signature.data)
+        self.signature.signature.data = b"\x00" * sigsize
+
+        for i in range(65535):  # Max value for unsigned short integer (2 bytes)
+            # Modify tmd padding2
+            self.hdr.padding2 = i
+
+            # Calculate hash
+            sha1hash = utils.Crypto.create_sha1hash_hex(self.signature_pack())
+
+            # Found valid hash!
+            if sha1hash.startswith("00"):
+                return self.dump(output)
+
+        raise Exception("Fakesigning failed.")
 
     def pack(self):
         """Returns TMD WITHOUT certificates."""
@@ -711,6 +733,28 @@ class Ticket:
             if ROOT_KEY:
                 return ROOT_KEY
         raise ValueError("Certificate '{0}' not found.".format(name))
+
+    def fakesign(self, output=None):
+        """Fakesigns ticket and dumps it. Replaces {titleid} and {titleversion} if in filename.
+           Returns raw binary if no output is given, returns the file path else.
+           https://github.com/FIX94/Some-YAWMM-Mod/blob/e2708863036066c2cc8bad1fc142e90fb8a0464d/source/title.c#L22-L48
+        """
+        # Fill signature with zeroes
+        sigsize = len(self.signature.signature.data)
+        self.signature.signature.data = b"\x00" * sigsize
+
+        for i in range(65535):  # Max value for unsigned short integer (2 bytes)
+            # Modify ticket padding
+            self.hdr.padding = i
+
+            # Calculate hash
+            sha1hash = utils.Crypto.create_sha1hash_hex(self.signature_pack())
+
+            # Found valid hash!
+            if sha1hash.startswith("00"):
+                return self.dump(output)
+
+        raise Exception("Fakesigning failed.")
 
     def pack(self):
         """Returns ticket WITHOUT certificates"""
