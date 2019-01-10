@@ -306,8 +306,8 @@ class TMD:
         def __str__(self):
             output = "Content:\n"
             output += "   ID         Index   Type     Size       Hash\n"
-            output += "   {:08X}   {:<7d} {:<8s} {:<11s}".format(
-                self.cid,
+            output += "   {:s}   {:<7d} {:<8s} {:<11s}".format(
+                self.get_cid(),
                 self.index,
                 self.get_type(),
                 utils.convert_size(self.size)
@@ -525,8 +525,8 @@ class TMD:
         output += "  Contents:\n"
         output += "   ID         Index   Type     Size       Hash\n"
         for content in self.contents:
-            output += "   {:08X}   {:<7d} {:<8s} {:<11s}".format(
-                content.cid,
+            output += "   {:s}   {:<7d} {:<8s} {:<11s}".format(
+                content.get_cid(),
                 content.index,
                 content.get_type(),
                 utils.convert_size(content.size)
