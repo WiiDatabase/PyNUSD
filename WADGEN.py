@@ -471,7 +471,6 @@ class TMD:
 
     def pack(self):
         """Returns TMD WITHOUT certificates."""
-        pack = self.signature.pack()
         return self.signature.pack() + self.signature_pack()
 
     def signature_pack(self):
