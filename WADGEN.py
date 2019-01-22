@@ -1138,7 +1138,7 @@ class WADMaker:
         tmdcontent.sha1 = utils.Crypto.create_sha1hash(decdata)
 
         # Dump TMD
-        if self._titlever:
+        if self._titlever != None:
             self.tmd.dump(os.path.join(self.directory, "tmd.{0}".format(self._titlever)))
         else:
             self.tmd.dump(os.path.join(self.directory, "tmd"))
