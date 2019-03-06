@@ -419,7 +419,8 @@ class TMD:
                 "Japan",
                 "USA",
                 "Europe",
-                "Free"
+                "Free",
+                "Korea"
             ]
             try:
                 return regions[self.hdr.region]
