@@ -153,7 +153,7 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
                     else:
                         print("      Content exists, but hash check failed - redownloading...")
 
-        req = get(content_url, stream=True)
+        req = get(content_url)
         if req.status_code != 200:
             print("      Failed to download content")
             return
