@@ -98,6 +98,8 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         cetk.hdr.titleid = tmd.hdr.titleid
         cetk.hdr.titleversion = tmd.hdr.titleversion
         cetk.hdr.titlekey = binascii.a2b_hex(enc_titlekey)
+        if tmd.get_region() == "Korea" and not tmd.get_titleid().startswith("00030"):  # Korea + not DSi
+            cetk.hdr.ckeyindex = 1  # Korean common-key index
         cetk.dump(os.path.join(titlepath, "cetk"))
         if localuse:  # We need to set Title IV and decrypt the titlekey for verifying
             cetk.titleiv = struct.pack(">Q", cetk.hdr.titleid) + b"\x00" * 8
