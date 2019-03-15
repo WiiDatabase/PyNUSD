@@ -93,6 +93,7 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
 
     # Download Ticket
     if enc_titlekey:
+        # TODO: Generate DSi tickets
         print("* Generating Ticket...")
         cetk = WADGEN.Ticket(tickettemplate)
         cetk.hdr.titleid = tmd.hdr.titleid
@@ -101,7 +102,7 @@ def main(titleid, titlever=None, pack_as_wad=True, decryptcontents=False, localu
         if tmd.get_region() == "Korea" and not tmd.get_titleid().startswith("00030"):  # Korea + not DSi
             cetk.hdr.ckeyindex = 1  # Korean common-key index
         elif titleid.startswith("00000007") or titleid.startswith("0007"):  # Wii U Wii Mode
-            cetk.hdr.ckeyindex = 2
+            cetk.hdr.ckeyindex = 2  # vWii common-key index
         cetk.dump(os.path.join(titlepath, "cetk"))
         if localuse:  # We need to set Title IV and decrypt the titlekey for verifying
             cetk.titleiv = struct.pack(">Q", cetk.hdr.titleid) + b"\x00" * 8
