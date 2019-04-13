@@ -563,7 +563,7 @@ class TMD:
             if verified:
                 output += "[OK]"
             else:
-                if sha1hash.startswith("00"):
+                if sha1hash.startswith("00") and int.from_bytes(self.signature.signature.data, byteorder="big") == 0:
                     output += "[FAKESIGNED]"
                 else:
                     output += "[FAIL]"
@@ -586,10 +586,7 @@ class TMD:
             if verified:
                 output += "[OK]"
             else:
-                if sha1hash.startswith("00"):
-                    output += "[FAKESIGNED]"
-                else:
-                    output += "[FAIL]"
+                output += "[FAIL]"
             output += "\n"
 
             # Check Root signature
@@ -610,10 +607,7 @@ class TMD:
                 if verified:
                     output += "[OK]"
                 else:
-                    if sha1hash.startswith("00"):
-                        output += "[FAKESIGNED]"
-                    else:
-                        output += "[FAIL]"
+                    output += "[FAIL]"
             else:
                 output += "    {0} ({1}) signed by {2}: Please place root-key in the same directory".format(
                     self.certificates[signs_cp].get_name(),
@@ -830,7 +824,7 @@ class Ticket:
             if verified:
                 output += "[OK]"
             else:
-                if sha1hash.startswith("00"):
+                if sha1hash.startswith("00") and int.from_bytes(self.signature.signature.data, byteorder="big") == 0:
                     output += "[FAKESIGNED]"
                 else:
                     output += "[FAIL]"
@@ -853,10 +847,7 @@ class Ticket:
             if verified:
                 output += "[OK]"
             else:
-                if sha1hash.startswith("00"):
-                    output += "[FAKESIGNED]"
-                else:
-                    output += "[FAIL]"
+                output += "[FAIL]"
             output += "\n"
 
             # Check Root signature
@@ -877,10 +868,7 @@ class Ticket:
                 if verified:
                     output += "[OK]"
                 else:
-                    if sha1hash.startswith("00"):
-                        output += "[FAKESIGNED]"
-                    else:
-                        output += "[FAIL]"
+                    output += "[FAIL]"
             else:
                 output += "    {0} ({1}) signed by {2}: Please place root-key in the same directory".format(
                     self.certificates[signs_cp].get_name(),
