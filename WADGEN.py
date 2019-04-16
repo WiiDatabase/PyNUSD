@@ -953,6 +953,51 @@ class WAD:
         else:
             self.footer = None
 
+    def pack(self):
+        """Returns WAD file in binary."""
+        # Header
+        wad = self.hdr.pack()
+        wad += utils.align(len(self.hdr))
+
+        # Certificate Chain
+        wad += b"".join([x.pack() for x in self.certificates])
+        wad += utils.align(self.hdr.certchainsize)
+
+        # Ticket
+        wad += self.ticket.pack()
+        wad += utils.align(self.hdr.ticketsize)
+
+        # TMD
+        wad += self.tmd.pack()
+        wad += utils.align(self.hdr.tmdsize)
+
+        # Contents
+        for content in self.contents:
+            wad += content
+            wad += utils.align(len(content))
+
+        # Footer
+        if self.footer:
+            wad += self.footer
+            wad += utils.align(self.hdr.footersize)
+        return wad
+
+    def dump(self, output=None):
+        """Dumps WAD to output. Replaces {titleid} and {titleversion} if in filename.
+           Returns raw binary if no output is given, returns the file path else.
+        """
+        if output:
+            output = output.format(titleid=self.tmd.get_titleid(), titleversion=self.tmd.hdr.titleversion)
+
+        pack = self.pack()
+
+        if output:
+            with open(output, "wb") as wad_file:
+                wad_file.write(pack)
+                return output
+        else:
+            return pack
+
     def unpack_file(self, cid, output=None, decrypt=False):
         """"Extracts file from WAD to output directory. Replaces {titleid} and {titleversion} if in folder name.
             Extracts to "extracted_wads/TITLEID/TITLEVER" if no output is given. Pass decrypt=True to decrypt.
