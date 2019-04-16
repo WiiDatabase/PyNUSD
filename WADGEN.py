@@ -448,15 +448,15 @@ class TMD:
                 return ROOT_KEY
         raise ValueError("Certificate '{0}' not found.".format(name))
 
-    def fakesign(self, output=None):
-        """Fakesigns TMD and dumps it. Replaces {titleid} and {titleversion} if in filename.
-           Returns raw binary if no output is given, returns the file path else.
+    def fakesign(self):
+        """Fakesigns TMD.
            https://github.com/FIX94/Some-YAWMM-Mod/blob/e2708863036066c2cc8bad1fc142e90fb8a0464d/source/title.c#L50-L76
         """
         # Fill signature with zeroes
         sigsize = len(self.signature.signature.data)
         self.signature.signature.data = b"\x00" * sigsize
 
+        # Modify content until SHA1 hash starts with 00
         for i in range(65535):  # Max value for unsigned short integer (2 bytes)
             # Modify tmd padding2
             self.hdr.padding2 = i
@@ -466,7 +466,7 @@ class TMD:
 
             # Found valid hash!
             if sha1hash.startswith("00"):
-                return self.dump(output)
+                return
 
         raise Exception("Fakesigning failed.")
 
@@ -728,15 +728,15 @@ class Ticket:
                 return ROOT_KEY
         raise ValueError("Certificate '{0}' not found.".format(name))
 
-    def fakesign(self, output=None):
-        """Fakesigns ticket and dumps it. Replaces {titleid} and {titleversion} if in filename.
-           Returns raw binary if no output is given, returns the file path else.
+    def fakesign(self):
+        """Fakesigns ticket.
            https://github.com/FIX94/Some-YAWMM-Mod/blob/e2708863036066c2cc8bad1fc142e90fb8a0464d/source/title.c#L22-L48
         """
         # Fill signature with zeroes
         sigsize = len(self.signature.signature.data)
         self.signature.signature.data = b"\x00" * sigsize
 
+        # Modify content until SHA1 hash starts with 00
         for i in range(65535):  # Max value for unsigned short integer (2 bytes)
             # Modify ticket padding
             self.hdr.padding = i
@@ -746,7 +746,7 @@ class Ticket:
 
             # Found valid hash!
             if sha1hash.startswith("00"):
-                return self.dump(output)
+                return
 
         raise Exception("Fakesigning failed.")
 
