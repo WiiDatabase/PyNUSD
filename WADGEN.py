@@ -1168,8 +1168,11 @@ class WADMaker:
             encrypted_content_file.write(encdata)
 
         # Update TMD
+        newhash = utils.Crypto.create_sha1hash(decdata)
         tmdcontent.size = len(decdata)
-        tmdcontent.sha1 = utils.Crypto.create_sha1hash(decdata)
+        if tmdcontent.sha1 != newhash:
+            tmdcontent.sha1 = newhash
+            self.tmd.fakesign()
 
         # Dump TMD
         if self._titlever != None:
