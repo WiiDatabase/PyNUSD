@@ -1270,7 +1270,7 @@ class WADMaker:
                 for chunk in utils.read_in_chunks(content):
                     content_length += len(chunk)
                     wad_file.write(chunk)
-                    wad_file.write(utils.align(content_length))
+                wad_file.write(utils.align(content_length))
                 total_content_length += content_length
             # Footer
             if self.footer:
