@@ -1141,7 +1141,11 @@ class WADMaker:
         self.hdr.certchainsize = len(b"".join([x.pack() for x in self.certificates]))
         self.hdr.ticketsize = len(self.ticket)
         self.hdr.tmdsize = len(self.tmd)
-        self.hdr.datasize = self.tmd.get_content_size()
+        datasize = self.tmd.get_content_size()
+        if datasize > 0xFFFFFFFF:
+            self.hdr.datasize = 0xFFFFFFFF
+        else:
+            self.hdr.datasize = datasize
         self.hdr.footersize = len(self.footer)
 
         # Contents
