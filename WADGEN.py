@@ -353,6 +353,9 @@ class TMD:
     def get_required_title(self):
         return "{:08X}".format(self.hdr.system_version).zfill(16).lower()
 
+    def get_boot_index(self):
+        return ("%08X" % self.hdr.bootindex).lower()
+
     def get_issuer(self):
         """Returns list with the certificate chain issuers.
            There should be exactly three: the last one (CP) signs the TMD,
@@ -519,6 +522,8 @@ class TMD:
             output += "  Region: {0}\n".format(self.get_region())
         if self.hdr.system_version:
             output += "  Requires: {0}\n".format(self.get_required_title())
+        if self.hdr.bootindex:
+            output += "  Boot APP: {0}\n".format(self.get_boot_index())
         output += "\n"
 
         output += "  Number of contents: {0}\n".format(self.hdr.contentcount)
