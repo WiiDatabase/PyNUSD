@@ -10,3 +10,5 @@ venv/
 root-key
 extracted_wads/
 titles/
+*.wad
+loader.bin
