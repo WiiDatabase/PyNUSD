@@ -299,6 +299,22 @@ class TMD:
             except KeyError:
                 return "Unknown"
 
+        def get_sha1_hex(self):
+            return binascii.hexlify(self.sha1).decode()
+
+        def get_hash_type(self):
+            hashes = {
+                "0d946e47249b00f6ad6c0037413d645da1a59f22": "Tiny vWii NAND Loader r2",
+                "9d19271538fbbef920a566a855cac71aa3fa4992": "Custom NAND Loader v1.1 MOD",
+                "f6b96dbf81b34500e1f723cab7acf544a40779db": "Custom NAND Loader v1.1 MOD IOS53",
+                "25c8b3c3ba6b1f0a27db400a5705652afdc22748": "Custom NAND Loader v1.1 MOD IOS55",
+                "7973a2a2123e7e4d716bba4a19855691f5ff458c": "Custom NAND Loader v1.1 MOD IOS56",
+            }
+            try:
+                return hashes[self.get_sha1_hex()]
+            except KeyError:
+                return None
+
         def __repr__(self):
             output = "Content {0}".format(self.get_cid())
             return output
@@ -312,7 +328,10 @@ class TMD:
                 self.get_type(),
                 utils.convert_size(self.size)
             )
-            output += binascii.hexlify(self.sha1).decode() + "\n"
+            output += self.get_sha1_hex()
+            if self.get_hash_type():
+                output += " ({0})".format(self.get_hash_type())
+            output += "\n"
 
             return output
 
@@ -536,7 +555,10 @@ class TMD:
                 content.get_type(),
                 utils.convert_size(content.size)
             )
-            output += binascii.hexlify(content.sha1).decode() + "\n"
+            output += content.get_sha1_hex()
+            if content.get_hash_type():
+                output += " ({0})".format(content.get_hash_type())
+            output += "\n"
 
         # TODO: Improve this, is a bit complicated to understand and duplicated
         if self.certificates:
