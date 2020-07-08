@@ -1179,6 +1179,11 @@ class WADMaker:
         # Update TMD
         newhash = utils.Crypto.create_sha1hash(decdata)
         tmdcontent.size = len(decdata)
+        new_datasize = 0
+        for content in self.tmd.contents:
+            new_datasize += utils.align_pointer(content.size)
+        self.hdr.datasize = new_datasize
+
         if tmdcontent.sha1 != newhash:
             tmdcontent.sha1 = newhash
             self.tmd.fakesign()
@@ -1270,7 +1275,6 @@ class WADMaker:
         wad += utils.align(self.hdr.tmdsize)
 
         # Writing WAD
-        total_content_length = 0
         with open(output, "wb") as wad_file:
             wad_file.write(wad)
             # Not forgetting Contents!
@@ -1280,7 +1284,6 @@ class WADMaker:
                     content_length += len(chunk)
                     wad_file.write(chunk)
                 wad_file.write(utils.align(content_length))
-                total_content_length += content_length
             # Footer
             if self.footer:
                 wad_file.write(self.footer)
