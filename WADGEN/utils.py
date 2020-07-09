@@ -1,10 +1,22 @@
 import hashlib
 import math
 
+from Crypto.Cipher import AES
+
 
 class Crypto:
     """"This is a Cryptographic/hash class used to abstract away things."""
     blocksize = 64
+
+    @classmethod
+    def decrypt_titlekey(cls, commonkey: bytes, iv: bytes, titlekey: bytes) -> bytes:
+        """Decrypts title key from the ticket."""
+        return AES.new(key=commonkey, mode=AES.MODE_CBC, iv=iv).decrypt(titlekey)
+
+    @classmethod
+    def encrypt_titlekey(cls, commonkey: bytes, iv: bytes, titlekey: bytes) -> bytes:
+        """Encrypts title key."""
+        return AES.new(key=commonkey, mode=AES.MODE_CBC, iv=iv).encrypt(titlekey)
 
     @classmethod
     def create_sha1hash_hex(cls, data) -> str:

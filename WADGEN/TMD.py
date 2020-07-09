@@ -353,6 +353,7 @@ class TMD(Base):
         """Fakesigns TMD.
            https://github.com/FIX94/Some-YAWMM-Mod/blob/e2708863036066c2cc8bad1fc142e90fb8a0464d/source/title.c#L50-L76
         """
+        oldval = self.unused
         self.signature.zerofill()
         for i in range(65535):  # Max value for unsigned short integer (2 bytes)
             # Modify unused data
@@ -365,6 +366,7 @@ class TMD(Base):
             if sha1hash.startswith("00"):
                 return
 
+        self.unused = oldval
         raise Exception("Fakesigning failed.")
 
     def pack(self, include_signature=True, include_certificates=False) -> bytes:
@@ -407,8 +409,8 @@ class TMD(Base):
         """
         output = output.format(titleid=self.get_titleid(), titleversion=self.get_titleversion())
         pack = self.pack(include_signature=include_signature, include_certificates=include_certificates)
-        with open(output, "wb") as tmd_file:
-            tmd_file.write(pack)
+        with open(output, "wb") as file:
+            file.write(pack)
         return output
 
     def __repr__(self):
