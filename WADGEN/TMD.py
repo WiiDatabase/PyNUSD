@@ -3,7 +3,7 @@ from binascii import hexlify
 from io import BytesIO
 from typing import Union, Optional, List
 
-from WADGEN import Base, utils, Signature, Certificate, ROOT_KEY
+from WADGEN import Base, utils, Signature, Certificate, ROOT_KEY, SIGNATURETYPES, PUBLICKEYTYPES
 
 
 class TMDContent:
@@ -118,7 +118,7 @@ class TMDContent:
 
 class TMD(Base):
     def __init__(self, f: Union[str, bytes, bytearray, None] = None):
-        self.signature = Signature(sigtype=65537)
+        self.signature = Signature(sigtype=SIGNATURETYPES.RSA_2048_SHA1)
         self.issuer = b"\x00" * 64
         self.version = 0
         self.ca_crl_version = 0
@@ -140,7 +140,8 @@ class TMD(Base):
         self.bootindex = 0
         self.unused = 0
         self.contents = []
-        self.certificates = [Certificate(sigtype=0x10001, keytype=1), Certificate(sigtype=0x10000, keytype=1)]
+        self.certificates = [Certificate(sigtype=SIGNATURETYPES.RSA_2048_SHA1, keytype=PUBLICKEYTYPES.RSA_2048),
+                             Certificate(sigtype=SIGNATURETYPES.RSA_4096_SHA1, keytype=PUBLICKEYTYPES.RSA_2048)]
 
         super().__init__(f)
 
@@ -224,6 +225,7 @@ class TMD(Base):
                 return "Unknown"
 
     def get_region(self) -> str:
+        # TODO: set_region()
         if self.get_titleid().startswith("00030"):  # DSi
             # https://dsibrew.org/wiki/Title_list#Region_Codes
             regions = {

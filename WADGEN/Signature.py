@@ -3,6 +3,12 @@ from io import BytesIO
 from typing import Optional
 
 
+class SIGNATURETYPES:
+    RSA_4096_SHA1 = 0x010000
+    RSA_2048_SHA1 = 0x10001
+    ECC_SHA1 = 0x010002
+
+
 class Signature:
     def __init__(self, f: Optional[BytesIO] = None, sigtype: Optional[int] = None):
         if f and sigtype:

@@ -3,12 +3,19 @@ import struct
 from io import BytesIO
 from typing import Union, List
 
-from WADGEN import Base, Signature, Certificate, ROOT_KEY, utils, DSI_KEY, DECRYPTION_KEYS
+from WADGEN import Base, Signature, Certificate, ROOT_KEY, utils, SIGNATURETYPES, PUBLICKEYTYPES
+
+
+class KEYS:
+    COMMON_KEY = b"\xEB\xE4\x2A\x22\x5E\x85\x93\xE4\x48\xD9\xC5\x45\x73\x81\xAA\xF7"
+    KOREAN_KEY = b"\x63\xB8\x2B\xB4\xF4\x61\x4E\x2E\x13\xF2\xFE\xFB\xBA\x4C\x9B\x7E"
+    VWII_KEY = b"\x30\xbf\xc7\x6e\x7c\x19\xaf\xbb\x23\x16\x33\x30\xce\xd7\xc2\x8d"
+    DSI_KEY = b"\xAF\x1B\xF5\x16\xA8\x07\xD2\x1A\xEA\x45\x98\x4F\x04\x74\x28\x61"
 
 
 class Ticket(Base):
     def __init__(self, f: Union[str, bytes, bytearray, None] = None):
-        self.signature = Signature(sigtype=65537)
+        self.signature = Signature(sigtype=SIGNATURETYPES.RSA_2048_SHA1)
         self.issuer = b"\x00" * 64
         self.ecdhdata = b"\x00" * 60
         self.unused1 = b"\x00" * 3
@@ -27,7 +34,8 @@ class Ticket(Base):
         self.content_access_permissions = b"\x00" * 64
         self.padding = 0
         self.limits = b"\x00" * 64
-        self.certificates = [Certificate(sigtype=0x10001, keytype=1), Certificate(sigtype=0x10000, keytype=1)]
+        self.certificates = [Certificate(sigtype=SIGNATURETYPES.RSA_2048_SHA1, keytype=PUBLICKEYTYPES.RSA_2048),
+                             Certificate(sigtype=SIGNATURETYPES.RSA_4096_SHA1, keytype=PUBLICKEYTYPES.RSA_2048)]
 
         super().__init__(f)
 
@@ -142,12 +150,21 @@ class Ticket(Base):
         # TODO: Debug (RVT) Tickets
         """Returns the appropiate Common Key"""
         if self.get_titleid().startswith("00030"):
-            return DSI_KEY
-        try:
-            return DECRYPTION_KEYS[self.ckeyindex]
-        except IndexError:
+            return KEYS.DSI_KEY
+
+        ckeyindex = self.get_common_key_index()
+        if ckeyindex == 0:
+            return KEYS.COMMON_KEY
+        elif ckeyindex == 1:
+            return KEYS.KOREAN_KEY
+        elif ckeyindex == 2:
+            return KEYS.VWII_KEY
+        else:
             print("WARNING: Unknown Common Key, assuming normal key")
-            return DECRYPTION_KEYS[0]
+            return KEYS.COMMON_KEY
+
+    def get_common_key_index(self) -> int:
+        return self.ckeyindex
 
     def get_common_key_type(self) -> str:
         if self.get_titleid().startswith("00030"):

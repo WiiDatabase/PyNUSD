@@ -8,6 +8,12 @@ from Crypto.Signature import PKCS1_v1_5
 from WADGEN import Signature, Base
 
 
+class PUBLICKEYTYPES:
+    RSA_4096 = 0
+    RSA_2048 = 1
+    ECC = 2
+
+
 class Certificate:
     def __init__(self,
                  f: Optional[BytesIO] = None,
