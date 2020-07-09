@@ -37,5 +37,7 @@ jobs:
         run: |
           pytest
       - name: Upload coverage
-        shell: pwsh
-        run: coverage report -m
+        uses: codecov/codecov-action@v1
+        with:
+          file: ./coverage.xml
+          flags: unittests
