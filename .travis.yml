@@ -1,0 +1,21 @@
+language: python
+python:
+  - "3.6"
+  - "3.7"
+  - "3.8"
+  - "3.9-dev"
+  - "pypy3.5"
+  - "pypy3.6"
+  - "nightly"
+
+dist: bionic
+sudo: false
+
+cache: pip
+
+install:
+  - pip install -U -r requirements.txt
+  - pip install -U -r requirements-dev.txt
+
+script:
+  - pytest -v
