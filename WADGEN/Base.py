@@ -5,7 +5,7 @@ from typing import Union
 
 class Base(ABC):
 
-    def __init__(self, f: Union[str, bytes, bytearray, None] = None):
+    def __init__(self, f: Union[str, bytes, bytearray, BytesIO, None] = None):
         super().__init__()
         if f:
             if isinstance(f, str):
@@ -14,8 +14,10 @@ class Base(ABC):
                 self.parse_bytearray(f)
             elif isinstance(f, bytes):
                 self.parse_bytes(f)
+            elif isinstance(f, BytesIO):
+                self.parse(f)
             else:
-                raise Exception("Argument must either be a path to a file, bytes or a bytearray.")
+                raise Exception("Argument must either be a path to a file, BytesIO, bytes or a bytearray.")
 
     @abstractmethod
     def parse(self, f: BytesIO):

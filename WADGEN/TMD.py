@@ -32,7 +32,7 @@ class REGION(Enum):
 
 
 class TMDContent:
-    def __init__(self, f: Optional[bytes] = None):
+    def __init__(self, f: Union[bytes, BytesIO, None] = None):
         self.cid = 0
         self.index = 0
         self.type = CONTENTTYPE.NORMAL.value
@@ -42,11 +42,12 @@ class TMDContent:
         if f:
             if isinstance(f, bytes):
                 self.parse_bytes(f)
+            elif isinstance(f, BytesIO):
+                self.parse(f)
             else:
-                raise Exception("Argument must be bytes.")
+                raise Exception("Argument must be BytesIO or bytes.")
 
     def parse(self, f: BytesIO):
-        f.seek(0)
         self.cid = struct.unpack(">L", f.read(4))[0]
         self.index = struct.unpack(">H", f.read(2))[0]
         self.type = struct.unpack(">H", f.read(2))[0]
@@ -172,7 +173,7 @@ class TMDContent:
 
 
 class TMD(Base):
-    def __init__(self, f: Union[str, bytes, bytearray, None] = None):
+    def __init__(self, f: Union[str, bytes, bytearray, BytesIO, None] = None):
         self.signature = Signature(sigtype=SIGNATURETYPE.RSA_2048_SHA1)
         self.issuer = b"\x00" * 64
         self.version = 0
@@ -201,7 +202,6 @@ class TMD(Base):
         super().__init__(f)
 
     def parse(self, f: BytesIO):
-        f.seek(0)
         self.signature = Signature(f)
         self.issuer = f.read(64)
         self.version = struct.unpack(">B", f.read(1))[0]
@@ -226,7 +226,7 @@ class TMD(Base):
 
         self.contents = []
         for i in range(self.get_content_count()):
-            self.contents.append(TMDContent(f.read(36)))
+            self.contents.append(TMDContent(f))
 
         self.certificates = []
         for i in range(2):

@@ -21,7 +21,7 @@ class KEY(Enum):
 
 
 class Ticket(Base):
-    def __init__(self, f: Union[str, bytes, bytearray, None] = None):
+    def __init__(self, f: Union[str, bytes, bytearray, BytesIO, None] = None):
         self.signature = Signature(sigtype=SIGNATURETYPE.RSA_2048_SHA1)
         self.issuer = b"\x00" * 64
         self.ecdhdata = b"\x00" * 60
@@ -47,7 +47,6 @@ class Ticket(Base):
         super().__init__(f)
 
     def parse(self, f: BytesIO):
-        f.seek(0)
         self.signature = Signature(f)
         self.issuer = f.read(64)
         self.ecdhdata = f.read(60)

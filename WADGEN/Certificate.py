@@ -133,14 +133,13 @@ class Certificate:
 
 
 class RootKey(Base):
-    def __init__(self, f: Union[str, bytes, bytearray, None] = None):
+    def __init__(self, f: Union[str, bytes, bytearray, BytesIO, None] = None):
         self.modulus = b"\x00" * 512
         self.exponent = 0
 
         super().__init__(f)
 
     def parse(self, f: BytesIO):
-        f.seek(0)
         self.modulus = f.read(512)
         self.exponent = struct.unpack(">I", f.read(4))[0]
 
