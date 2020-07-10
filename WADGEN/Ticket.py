@@ -1,12 +1,19 @@
 import binascii
 import struct
+from enum import Enum
 from io import BytesIO
 from typing import Union, List
 
-from WADGEN import Base, Signature, Certificate, ROOT_KEY, utils, SIGNATURETYPES, PUBLICKEYTYPES
+from WADGEN import Base, Signature, Certificate, ROOT_KEY, utils, SIGNATURETYPE, PUBLICKEYTYPE
 
 
-class KEYS:
+class CKEYTYPE(Enum):
+    NORMAL = 0
+    KOREA = 1
+    VWII = 2
+
+
+class KEY(Enum):
     COMMON_KEY = b"\xEB\xE4\x2A\x22\x5E\x85\x93\xE4\x48\xD9\xC5\x45\x73\x81\xAA\xF7"
     KOREAN_KEY = b"\x63\xB8\x2B\xB4\xF4\x61\x4E\x2E\x13\xF2\xFE\xFB\xBA\x4C\x9B\x7E"
     VWII_KEY = b"\x30\xbf\xc7\x6e\x7c\x19\xaf\xbb\x23\x16\x33\x30\xce\xd7\xc2\x8d"
@@ -15,7 +22,7 @@ class KEYS:
 
 class Ticket(Base):
     def __init__(self, f: Union[str, bytes, bytearray, None] = None):
-        self.signature = Signature(sigtype=SIGNATURETYPES.RSA_2048_SHA1)
+        self.signature = Signature(sigtype=SIGNATURETYPE.RSA_2048_SHA1)
         self.issuer = b"\x00" * 64
         self.ecdhdata = b"\x00" * 60
         self.unused1 = b"\x00" * 3
@@ -29,13 +36,13 @@ class Ticket(Base):
         self.permitted_titles_mask = 0
         self.permit_mask = 0
         self.export_allowed = False
-        self.ckeyindex = 0
+        self.ckeyindex = CKEYTYPE.NORMAL.value
         self.unknown3 = b"\x00" * 48
         self.content_access_permissions = b"\x00" * 64
         self.padding = 0
         self.limits = b"\x00" * 64
-        self.certificates = [Certificate(sigtype=SIGNATURETYPES.RSA_2048_SHA1, keytype=PUBLICKEYTYPES.RSA_2048),
-                             Certificate(sigtype=SIGNATURETYPES.RSA_4096_SHA1, keytype=PUBLICKEYTYPES.RSA_2048)]
+        self.certificates = [Certificate(sigtype=SIGNATURETYPE.RSA_2048_SHA1, keytype=PUBLICKEYTYPE.RSA_2048),
+                             Certificate(sigtype=SIGNATURETYPE.RSA_4096_SHA1, keytype=PUBLICKEYTYPE.RSA_2048)]
 
         super().__init__(f)
 
@@ -150,18 +157,18 @@ class Ticket(Base):
         # TODO: Debug (RVT) Tickets
         """Returns the appropiate Common Key"""
         if self.get_titleid().startswith("00030"):
-            return KEYS.DSI_KEY
+            return KEY.DSI_KEY.value
 
         ckeyindex = self.get_common_key_index()
         if ckeyindex == 0:
-            return KEYS.COMMON_KEY
+            return KEY.COMMON_KEY.value
         elif ckeyindex == 1:
-            return KEYS.KOREAN_KEY
+            return KEY.KOREAN_KEY.value
         elif ckeyindex == 2:
-            return KEYS.VWII_KEY
+            return KEY.VWII_KEY.value
         else:
             print("WARNING: Unknown Common Key, assuming normal key")
-            return KEYS.COMMON_KEY
+            return KEY.COMMON_KEY.value
 
     def get_common_key_index(self) -> int:
         return self.ckeyindex
@@ -212,13 +219,13 @@ class Ticket(Base):
             raise Exception("Invalid title version.")
         self.titleversion = ver
 
-    def set_common_key_index(self, i: int):
-        if not isinstance(i, int):
-            raise Exception("Integer expected.")
+    def set_common_key_index(self, ckeytype: CKEYTYPE):
+        if not isinstance(ckeytype, CKEYTYPE):
+            raise Exception("CKEYTYPE expected.")
 
-        if not 0 <= i <= 2:
+        if not 0 <= ckeytype.value <= 2:
             raise Exception("Invalid Common-Key index!")
-        self.ckeyindex = i
+        self.ckeyindex = ckeytype.value
 
     def set_titlekey(self, key: str, encrypted: bool = True):
         """encrypted = False will encrypt the titlekey beforehand."""

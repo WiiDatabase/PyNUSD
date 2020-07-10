@@ -1,16 +1,17 @@
 import struct
+from enum import Enum
 from io import BytesIO
 from typing import Optional
 
 
-class SIGNATURETYPES:
+class SIGNATURETYPE(Enum):
     RSA_4096_SHA1 = 0x010000
     RSA_2048_SHA1 = 0x10001
     ECC_SHA1 = 0x010002
 
 
 class Signature:
-    def __init__(self, f: Optional[BytesIO] = None, sigtype: Optional[int] = None):
+    def __init__(self, f: Optional[BytesIO] = None, sigtype: Optional[SIGNATURETYPE] = None):
         if f and sigtype:
             raise Exception("Signature type is not needed when file is passed.")
         if not f and not sigtype:
@@ -22,39 +23,37 @@ class Signature:
             else:
                 raise Exception("Argument must be BytesIO.")
         else:
-            if not isinstance(sigtype, int):
-                raise Exception("Signature type must be an integer.")
-            self.type = sigtype
+            if not isinstance(sigtype, SIGNATURETYPE):
+                raise Exception("Signature type must be from class SIGNATURETYPES.")
+            self.type = sigtype.value
             self.data = b"\x00" * self.get_signature_data_size()
             self.padding = b"\x00" * self.get_signature_padding_size()
 
     def get_signature_data_size(self) -> int:
         # https://www.3dbrew.org/wiki/Title_metadata#Signature_Type
-        signature_type = hex(self.type)
         signature_sizes = {
-            "0x10000": 0x200,
-            "0x10001": 0x100,
-            "0x10002": 0x3C
+            SIGNATURETYPE.RSA_4096_SHA1.value: 0x200,
+            SIGNATURETYPE.RSA_2048_SHA1.value: 0x100,
+            SIGNATURETYPE.ECC_SHA1.value:      0x3C
         }
 
         try:
-            return signature_sizes[signature_type]
+            return signature_sizes[self.type]
         except KeyError:
-            raise ValueError("Invalid signature type: {0}".format(signature_type))
+            raise ValueError("Invalid signature type: {0}".format(hex(self.type)))
 
     def get_signature_padding_size(self) -> int:
         # https://www.3dbrew.org/wiki/Title_metadata#Signature_Type
-        signature_type = hex(self.type)
         signature_sizes = {
-            "0x10000": 0x3C,
-            "0x10001": 0x3C,
-            "0x10002": 0x40
+            SIGNATURETYPE.RSA_4096_SHA1.value: 0x3C,
+            SIGNATURETYPE.RSA_2048_SHA1.value: 0x3C,
+            SIGNATURETYPE.ECC_SHA1.value:      0x40
         }
 
         try:
-            return signature_sizes[signature_type]
+            return signature_sizes[self.type]
         except KeyError:
-            raise ValueError("Invalid signature type: {0}".format(signature_type))
+            raise ValueError("Invalid signature type: {0}".format(hex(self.type)))
 
     def parse(self, f: BytesIO):
         self.type = struct.unpack(">I", f.read(4))[0]
@@ -77,7 +76,7 @@ class Signature:
 
     def write_data(self, byt: bytes):
         if len(byt) > self.get_signature_data_size():
-            raise ValueError("Data is bigger than {0} bytes".format(self.get_signature_padding_size()))
+            raise ValueError("Data is bigger than {0} bytes".format(self.get_signature_data_size()))
         self.data = byt
 
     def zerofill(self):

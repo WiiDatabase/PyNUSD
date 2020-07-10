@@ -1,16 +1,39 @@
 import struct
 from binascii import hexlify
+from enum import Enum
 from io import BytesIO
 from typing import Union, Optional, List
 
-from WADGEN import Base, utils, Signature, Certificate, ROOT_KEY, SIGNATURETYPES, PUBLICKEYTYPES
+from WADGEN import Base, utils, Signature, Certificate, ROOT_KEY, SIGNATURETYPE, PUBLICKEYTYPE
+
+
+class CONTENTTYPE(Enum):
+    NORMAL = 0x0001
+    DLC = 0x4001
+    SHARED = 0x8001
+
+
+class NANDLOADER(Enum):
+    TINY_VWII_NAND_LOADER_R2 = "0d946e47249b00f6ad6c0037413d645da1a59f22"
+    CUSTOM_NAND_LOADER_V11_MOD = "9d19271538fbbef920a566a855cac71aa3fa4992"
+    CUSTOM_NAND_LOADER_V11_MOD_IOS53 = "f6b96dbf81b34500e1f723cab7acf544a40779db"
+    CUSTOM_NAND_LOADER_V11_MOD_IOS55 = "25c8b3c3ba6b1f0a27db400a5705652afdc22748"
+    CUSTOM_NAND_LOADER_V11_MOD_IOS56 = "7973a2a2123e7e4d716bba4a19855691f5ff458c"
+
+
+class REGION(Enum):
+    JAPAN = 0
+    USA = 1
+    EUROPE = 2
+    FREE = 3
+    KOREA = 4
 
 
 class TMDContent:
     def __init__(self, f: Optional[bytes] = None):
         self.cid = 0
         self.index = 0
-        self.type = 1
+        self.type = CONTENTTYPE.NORMAL.value
         self.size = 0
         self.hash = b"\x00" * 20
 
@@ -42,11 +65,10 @@ class TMDContent:
         return struct.pack(">H", self.index) + b"\x00" * 14
 
     def get_type(self) -> str:
-        # https://github.com/dnasdw/libwiisharp/blob/master/libWiiSharp/TMD.cs#L27-L29
         types = {
-            0x0001: "Normal",
-            0x4001: "DLC",
-            0x8001: "Shared"
+            CONTENTTYPE.NORMAL.value: "Normal",
+            CONTENTTYPE.DLC.value: "DLC",
+            CONTENTTYPE.SHARED.value: "Shared"
         }
         try:
             return types[self.type]
@@ -58,11 +80,11 @@ class TMDContent:
 
     def get_loader(self) -> Optional[str]:
         hashes = {
-            "0d946e47249b00f6ad6c0037413d645da1a59f22": "Tiny vWii NAND Loader r2",
-            "9d19271538fbbef920a566a855cac71aa3fa4992": "Custom NAND Loader v1.1 MOD",
-            "f6b96dbf81b34500e1f723cab7acf544a40779db": "Custom NAND Loader v1.1 MOD IOS53",
-            "25c8b3c3ba6b1f0a27db400a5705652afdc22748": "Custom NAND Loader v1.1 MOD IOS55",
-            "7973a2a2123e7e4d716bba4a19855691f5ff458c": "Custom NAND Loader v1.1 MOD IOS56",
+            NANDLOADER.TINY_VWII_NAND_LOADER_R2.value: "Tiny vWii NAND Loader r2",
+            NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD.value: "Custom NAND Loader v1.1 MOD",
+            NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD_IOS53.value: "Custom NAND Loader v1.1 MOD IOS53",
+            NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD_IOS55.value: "Custom NAND Loader v1.1 MOD IOS55",
+            NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD_IOS56.value: "Custom NAND Loader v1.1 MOD IOS56",
         }
         try:
             return hashes[self.get_hash_hex()]
@@ -118,7 +140,7 @@ class TMDContent:
 
 class TMD(Base):
     def __init__(self, f: Union[str, bytes, bytearray, None] = None):
-        self.signature = Signature(sigtype=SIGNATURETYPES.RSA_2048_SHA1)
+        self.signature = Signature(sigtype=SIGNATURETYPE.RSA_2048_SHA1)
         self.issuer = b"\x00" * 64
         self.version = 0
         self.ca_crl_version = 0
@@ -129,7 +151,7 @@ class TMD(Base):
         self.type = 1
         self.group_id = 12337  # That's what the forecast channel uses
         self.zero = b"\x00" * 2
-        self.region = 0
+        self.region = REGION.JAPAN.value
         self.ratings = b"\x00" * 16
         self.reserved1 = b"\x00" * 12
         self.ipc_mask = b"\x00" * 12
@@ -140,8 +162,8 @@ class TMD(Base):
         self.bootindex = 0
         self.unused = 0
         self.contents = []
-        self.certificates = [Certificate(sigtype=SIGNATURETYPES.RSA_2048_SHA1, keytype=PUBLICKEYTYPES.RSA_2048),
-                             Certificate(sigtype=SIGNATURETYPES.RSA_4096_SHA1, keytype=PUBLICKEYTYPES.RSA_2048)]
+        self.certificates = [Certificate(sigtype=SIGNATURETYPE.RSA_2048_SHA1, keytype=PUBLICKEYTYPE.RSA_2048),
+                             Certificate(sigtype=SIGNATURETYPE.RSA_4096_SHA1, keytype=PUBLICKEYTYPE.RSA_2048)]
 
         super().__init__(f)
 
@@ -197,9 +219,12 @@ class TMD(Base):
     def is_vwii_title(self) -> bool:
         return self.is_vwii
 
+    def is_dsi_title(self) -> bool:
+        return self.get_titleid().startswith("00030")
+
     def get_type(self) -> str:
         # https://dsibrew.org/wiki/Title_list#System_Codes
-        if self.get_titleid().startswith("00030"):  # DSi
+        if self.is_dsi_title():  # DSi
             types = {
                 "4B": "DSiWare",
                 "48": "DSi System / Channel"
@@ -244,7 +269,6 @@ class TMD(Base):
             except KeyError:
                 return "Unknown"
         else:
-            # https://github.com/dnasdw/libwiisharp/blob/master/libWiiSharp/TMD.cs#L34-L37
             regions = [
                 "Japan",
                 "USA",

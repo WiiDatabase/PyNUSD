@@ -1,14 +1,15 @@
 import struct
+from enum import Enum
 from io import BytesIO
 from typing import Optional, Union
 
 from Crypto.PublicKey.RSA import construct as rsa_construct, RsaKey
 from Crypto.Signature import PKCS1_v1_5
 
-from WADGEN import Signature, Base
+from WADGEN import Signature, Base, SIGNATURETYPE
 
 
-class PUBLICKEYTYPES:
+class PUBLICKEYTYPE(Enum):
     RSA_4096 = 0
     RSA_2048 = 1
     ECC = 2
@@ -17,8 +18,8 @@ class PUBLICKEYTYPES:
 class Certificate:
     def __init__(self,
                  f: Optional[BytesIO] = None,
-                 sigtype: Optional[int] = None,
-                 keytype: Optional[int] = None):
+                 sigtype: Optional[SIGNATURETYPE] = None,
+                 keytype: Optional[PUBLICKEYTYPE] = None):
         if f and sigtype:
             raise Exception("Signature type is not needed when file is passed.")
         if f and keytype:
@@ -34,7 +35,7 @@ class Certificate:
         else:
             self.signature = Signature(sigtype=sigtype)
             self.issuer = b"\x00" * 64
-            self.keytype = keytype
+            self.keytype = keytype.value
             self.name = b"\x00" * 64
             self.unknown = b"\x00" * 4
             if self.keytype == 0:  # RSA_4096
