@@ -21,7 +21,7 @@ class KEY(Enum):
 
 
 class Ticket(Base):
-    def __init__(self, f: Union[str, bytes, bytearray, BytesIO, None] = None):
+    def __init__(self, f: Union[str, bytes, bytearray, BytesIO, None] = None, has_certificates: bool = True):
         self.signature = Signature(sigtype=SIGNATURETYPE.RSA_2048_SHA1)
         self.issuer = b"\x00" * 64
         self.ecdhdata = b"\x00" * 60
@@ -41,8 +41,12 @@ class Ticket(Base):
         self.content_access_permissions = b"\x00" * 64
         self.padding = 0
         self.limits = b"\x00" * 64
-        self.certificates = [Certificate(sigtype=SIGNATURETYPE.RSA_2048_SHA1, keytype=PUBLICKEYTYPE.RSA_2048),
-                             Certificate(sigtype=SIGNATURETYPE.RSA_4096_SHA1, keytype=PUBLICKEYTYPE.RSA_2048)]
+        self.certificates = []
+        if has_certificates:
+            self.certificates = [Certificate(sigtype=SIGNATURETYPE.RSA_2048_SHA1, keytype=PUBLICKEYTYPE.RSA_2048),
+                                 Certificate(sigtype=SIGNATURETYPE.RSA_4096_SHA1, keytype=PUBLICKEYTYPE.RSA_2048)]
+
+        self.has_certificates = has_certificates
 
         super().__init__(f)
 
@@ -68,8 +72,9 @@ class Ticket(Base):
         self.limits = f.read(64)
 
         self.certificates = []
-        for i in range(2):
-            self.certificates.append(Certificate(f))
+        if self.has_certificates:
+            for i in range(2):
+                self.certificates.append(Certificate(f))
 
     def pack(self, include_signature=True, include_certificates=False) -> bytes:
         pack = b""
@@ -101,7 +106,7 @@ class Ticket(Base):
         return pack
 
     def dump(self, output, include_signature=True, include_certificates=True) -> str:
-        """Dumps TMD to output. Replaces {titleid} and {titleversion} if in path.
+        """Dumps the Ticket to output. Replaces {titleid} and {titleversion} if in path.
            Returns the file path.
         """
         output = output.format(titleid=self.get_titleid(), titleversion=self.get_titleversion())

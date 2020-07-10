@@ -1,6 +1,7 @@
 import hashlib
 import math
 from enum import Enum
+from typing.io import BinaryIO
 
 from Crypto.Cipher import AES
 
@@ -44,7 +45,29 @@ def convert_size(size: int) -> str:
     return "%s %s" % (s, size_name[i])
 
 
-def align_pointer(value: int, block: int = 64):
+def align_data(data: bytes, blocksize: int = 64):
+    if len(data) % blocksize != 0:
+        return data + b"\x00" * (64 - (len(data) % 64))
+    else:
+        return data
+
+
+def align(value: int, blocksize: int = 64):
+    """Aligns value to blocksize
+
+    Args:
+        value (int): Length of bytes
+        blocksize (int): Block size (Default: 64)
+
+    """
+    if value % blocksize != 0:
+        return b"\x00" * (64 - (value % 64))
+    else:
+        return b""
+
+
+
+def align_pointer(value: int, block: int = 64) -> int:
     """Aligns pointer to blocksize
 
     Args:
@@ -56,3 +79,20 @@ def align_pointer(value: int, block: int = 64):
         return block - (value % block)
     else:
         return 0
+
+
+def align_value(value: int, block: int = 64) -> int:
+    if value % block != 0:
+        return value + (block - (value % block))
+    else:
+        return value
+
+
+def read_in_chunks(file_object: BinaryIO, chunk_size: int = 1024):
+    """Lazy function (generator) to read a file piece by piece.
+    Default chunk size: 1k."""
+    while True:
+        data = file_object.read(chunk_size)
+        if not data:
+            break
+        yield data
