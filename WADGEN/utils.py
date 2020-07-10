@@ -1,7 +1,14 @@
 import hashlib
 import math
+from enum import Enum
 
 from Crypto.Cipher import AES
+
+
+class MAXVALUE(Enum):
+    UINT16 = 65535
+    UINT32 = 4294967295
+    UINT64 = 18446744073709551615
 
 
 class Crypto:

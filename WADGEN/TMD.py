@@ -1,3 +1,4 @@
+import binascii
 import struct
 from binascii import hexlify
 from enum import Enum
@@ -5,6 +6,7 @@ from io import BytesIO
 from typing import Union, Optional, List
 
 from WADGEN import Base, utils, Signature, Certificate, ROOT_KEY, SIGNATURETYPE, PUBLICKEYTYPE
+from WADGEN.utils import MAXVALUE
 
 
 class CONTENTTYPE(Enum):
@@ -67,7 +69,7 @@ class TMDContent:
     def get_type(self) -> str:
         types = {
             CONTENTTYPE.NORMAL.value: "Normal",
-            CONTENTTYPE.DLC.value: "DLC",
+            CONTENTTYPE.DLC.value:    "DLC",
             CONTENTTYPE.SHARED.value: "Shared"
         }
         try:
@@ -75,13 +77,16 @@ class TMDContent:
         except KeyError:
             return "Unknown"
 
+    def get_hash(self) -> bytes:
+        return self.hash
+
     def get_hash_hex(self) -> str:
         return hexlify(self.hash).decode()
 
     def get_loader(self) -> Optional[str]:
         hashes = {
-            NANDLOADER.TINY_VWII_NAND_LOADER_R2.value: "Tiny vWii NAND Loader r2",
-            NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD.value: "Custom NAND Loader v1.1 MOD",
+            NANDLOADER.TINY_VWII_NAND_LOADER_R2.value:         "Tiny vWii NAND Loader r2",
+            NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD.value:       "Custom NAND Loader v1.1 MOD",
             NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD_IOS53.value: "Custom NAND Loader v1.1 MOD IOS53",
             NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD_IOS55.value: "Custom NAND Loader v1.1 MOD IOS55",
             NANDLOADER.CUSTOM_NAND_LOADER_V11_MOD_IOS56.value: "Custom NAND Loader v1.1 MOD IOS56",
@@ -101,6 +106,34 @@ class TMDContent:
 
     def get_pretty_size(self) -> str:
         return utils.convert_size(self.size)
+
+    def set_type(self, cnttype: CONTENTTYPE):
+        if not isinstance(cnttype, CONTENTTYPE):
+            raise Exception("CONTENTTYPE expected.")
+
+        self.type = cnttype.value
+
+    def set_hash(self, sha1hash: Union[str, bytes]):
+        if not isinstance(sha1hash, str) and not isinstance(sha1hash, bytes):
+            raise Exception("String or bytes expected")
+
+        if isinstance(sha1hash, bytes):
+            if len(sha1hash) != 20:
+                raise Exception("SHA1 hash must be 20 characters long.")
+            self.hash = sha1hash
+        else:
+            if len(sha1hash) != 40:
+                raise Exception("SHA1 hash must be 40 characters long.")
+            self.hash = binascii.a2b_hex(sha1hash)
+
+    def set_size(self, size: int):
+        if not isinstance(size, int):
+            raise Exception("Integer expected.")
+
+        if not 0 <= size <= MAXVALUE.UINT64.value:
+            raise Exception("Invalid size.")
+
+        self.size = size
 
     def pack(self) -> bytes:
         pack = b""
@@ -224,7 +257,7 @@ class TMD(Base):
 
     def get_type(self) -> str:
         # https://dsibrew.org/wiki/Title_list#System_Codes
-        if self.is_dsi_title():  # DSi
+        if self.is_dsi_title():
             types = {
                 "4B": "DSiWare",
                 "48": "DSi System / Channel"
@@ -250,8 +283,7 @@ class TMD(Base):
                 return "Unknown"
 
     def get_region(self) -> str:
-        # TODO: set_region()
-        if self.get_titleid().startswith("00030"):  # DSi
+        if self.is_dsi_title():
             # https://dsibrew.org/wiki/Title_list#Region_Codes
             regions = {
                 "41": "Free",
@@ -300,6 +332,9 @@ class TMD(Base):
 
     def get_contents(self) -> List[TMDContent]:
         return self.contents
+
+    def get_content(self, i: int) -> TMDContent:
+        return self.get_contents()[i]
 
     def get_encrypted_content_size(self) -> int:
         size = 0
@@ -360,9 +395,18 @@ class TMD(Base):
         if not isinstance(ver, int):
             raise Exception("Integer expected.")
 
-        if not 0 <= ver <= 65535:
+        if not 0 <= ver <= MAXVALUE.UINT16.value:
             raise Exception("Invalid title version.")
         self.titleversion = ver
+
+    def set_region(self, region: REGION):
+        if self.is_dsi_title():
+            raise Exception("The region of DSi titles is determined by their Title ID.")
+
+        if not isinstance(region, REGION):
+            raise Exception("REGION expected.")
+
+        self.region = region.value
 
     def set_vwii(self, is_vwii: bool):
         if not isinstance(is_vwii, bool):
@@ -370,7 +414,7 @@ class TMD(Base):
         self.is_vwii = is_vwii
 
     def set_access_rights(self, ar: int):
-        if not 0 <= ar <= 4294967295:
+        if not 0 <= ar <= MAXVALUE.UINT32.value:
             raise Exception("Invalid range.")
 
         self.access_rights = ar

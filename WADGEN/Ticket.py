@@ -4,7 +4,7 @@ from enum import Enum
 from io import BytesIO
 from typing import Union, List
 
-from WADGEN import Base, Signature, Certificate, ROOT_KEY, utils, SIGNATURETYPE, PUBLICKEYTYPE
+from WADGEN import Base, Signature, Certificate, ROOT_KEY, utils, SIGNATURETYPE, PUBLICKEYTYPE, MAXVALUE
 
 
 class CKEYTYPE(Enum):
@@ -215,7 +215,7 @@ class Ticket(Base):
         if not isinstance(ver, int):
             raise Exception("Integer expected.")
 
-        if not 0 <= ver <= 65535:
+        if not 0 <= ver <= MAXVALUE.UINT16.value:
             raise Exception("Invalid title version.")
         self.titleversion = ver
 
