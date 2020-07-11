@@ -4,7 +4,7 @@ from enum import Enum
 from io import BytesIO
 from typing import Union, List
 
-from WADGEN import Base, Certificate, Ticket, utils, TMD, ROOT_KEY
+from WADGEN import Certificate, Ticket, utils, TMD, ROOT_KEY
 
 
 class WADTYPE(Enum):
@@ -12,14 +12,13 @@ class WADTYPE(Enum):
     BOOT2 = b"ib"
 
 
-class WAD(Base):
+class WAD:
     HEADERSIZE = 32
     TICKETSIZE = 676
 
     def __init__(self, f: Union[str, None] = None):
         if f and not isinstance(f, str):
             raise Exception("WADs can only be loaded from a file.")
-
         self.header_size = self.HEADERSIZE
         self.type = WADTYPE.NORMAL.value
         self.version = 0
@@ -30,21 +29,36 @@ class WAD(Base):
         self.data_size = 0
         self.footer_size = 0
         self.padding = b"\x00" * 32
-        self.certificates = []
-        self.ticket = Ticket()
-        self.tmd = TMD()
+        self.certificates = []  # TODO: Init here
+        self.ticket = Ticket(has_certificates=False)
+        self.tmd = TMD(has_certificates=False)
         self.footer = None
 
         self.__f = f
         self.__footeroffset = None
         self.__dataoffset = None
 
-        super().__init__(f)
+        if f:
+            self.parse(f)
 
-    def parse_file(self, filename: str):
+    def parse(self, filename: str):
         with open(filename, "rb") as file:
-            header = BytesIO(file.read(self.HEADERSIZE))
-            self.parse_header(header)
+            self.header_size = struct.unpack(">L", file.read(4))[0]
+            if self.header_size != self.HEADERSIZE:
+                raise Exception("Invalid header size.")
+
+            self.type = file.read(2)
+            self.version = struct.unpack(">H", file.read(2))[0]
+            self.certchain_size = struct.unpack(">L", file.read(4))[0]
+            self.reserved = file.read(4)
+            self.ticket_size = struct.unpack(">L", file.read(4))[0]
+            if self.ticket_size != self.TICKETSIZE:
+                raise Exception("Invalid ticket size.")
+
+            self.tmd_size = struct.unpack(">L", file.read(4))[0]
+            self.data_size = struct.unpack(">L", file.read(4))[0]
+            self.footer_size = struct.unpack(">L", file.read(4))[0]
+            self.padding = file.read(32)
 
             # Certificates
             file.seek(utils.align_pointer(file.tell()), 1)
@@ -63,6 +77,13 @@ class WAD(Base):
             tmd = BytesIO(file.read(self.tmd_size))
             self.tmd = TMD(tmd, has_certificates=False)
 
+            if not self.get_data_size() > 0xFFFFFFFF:
+                expected_data_size = 0
+                for content in self.get_tmd().get_contents():
+                    expected_data_size += content.get_aligned_size()
+                if expected_data_size != self.get_data_size():
+                    print("WARNING: Data size in header does not match real data size.")
+
             # Contents would start here
             file.seek(utils.align_pointer(file.tell()), 1)
             self.__dataoffset = file.tell()
@@ -75,30 +96,6 @@ class WAD(Base):
                 self.footer = file.read(self.footer_size)
             else:
                 self.footer = None
-
-    def parse_header(self, header: BytesIO):
-        self.header_size = struct.unpack(">L", header.read(4))[0]
-        if self.header_size != self.HEADERSIZE:
-            raise Exception("Invalid header size.")
-
-        self.type = header.read(2)
-        self.version = struct.unpack(">H", header.read(2))[0]
-        self.certchain_size = struct.unpack(">L", header.read(4))[0]
-        self.reserved = header.read(4)
-        self.ticket_size = struct.unpack(">L", header.read(4))[0]
-        if self.ticket_size != self.TICKETSIZE:
-            raise Exception("Invalid ticket size.")
-
-        self.tmd_size = struct.unpack(">L", header.read(4))[0]
-        self.data_size = struct.unpack(">L", header.read(4))[0]
-        self.footer_size = struct.unpack(">L", header.read(4))[0]
-        self.padding = header.read(32)
-
-    def parse(self, f: BytesIO) -> NotImplemented:
-        return NotImplemented
-
-    def pack(self) -> NotImplemented:
-        return NotImplemented
 
     def dump(self, output) -> str:
         """Dumps the Ticket to output. Replaces {titleid} and {titleversion} if in path.
@@ -161,7 +158,7 @@ class WAD(Base):
                output=None,
                decrypt=True,
                include_signatures=True,
-               include_certificates=True):
+               append_certificates=True):
         """Extracts WAD to output. Replaces {titleid} and {titleversion} if in folder name.
            Extracts to "extracted_wads/TITLEID/TITLEVER" if no output is given.
        """
@@ -173,8 +170,8 @@ class WAD(Base):
         if not os.path.isdir(output):
             os.makedirs(output)
 
+        # Header
         with open(os.path.join(output, "header"), "wb") as header_file:
-            # Header
             header_file.write(struct.pack(">L", self.get_header_size()))
             header_file.write(self.type)
             header_file.write(struct.pack(">H", self.version))
@@ -186,18 +183,41 @@ class WAD(Base):
             header_file.write(struct.pack(">L", self.get_footer_size()))
             header_file.write(self.padding)
 
-        self.get_tmd().dump(os.path.join(output, "tmd"), include_signature=include_signatures)
+        # Ticket + TMD
         self.get_ticket().dump(os.path.join(output, "cetk"), include_signature=include_signatures)
+        self.get_tmd().dump(os.path.join(output, "tmd"), include_signature=include_signatures)
 
+        # Certificates
         certchain = b""
         for cert in self.get_certificates():
             certchain += cert.pack()
         with open(os.path.join(output, "cert.sys"), "wb") as cert_file:
             cert_file.write(certchain)
 
-        # TODO: Data
-        print("Dumping data is not implemented yet!")
+        # Data
+        # TODO: Fix wrong alignment
+        if self.__f:
+            with open(self.__f, "rb") as orig_file:
+                orig_file.seek(self.__dataoffset)
+                for content in self.get_tmd().get_contents():
+                    orig_content = orig_file.read(content.get_aligned_size())
+                    with open(os.path.join(output, content.get_cid()), "wb") as content_file:
+                        # print("Content {0}: Offset: {1}".format(content.get_cid(), orig_file.tell()))
+                        content_file.write(orig_content)
 
+                    # Optionally decrypt contents
+                    if decrypt:
+                        with open(os.path.join(output, content.get_cid()) + ".app", "wb") as content_file:
+                            decrypted_data = utils.Crypto.decrypt_data(
+                                    self.get_ticket().get_decrypted_titlekey(),
+                                    content.get_iv(),
+                                    orig_content
+                            )
+                            if utils.Crypto.create_sha1hash_hex(decrypted_data) != content.get_hash_hex():
+                                print("WARNING: SHA1 hash for content {0} does not match.".format(content.get_cid()))
+                            content_file.write(decrypted_data)
+
+        # Footer
         if self.has_footer():
             with open(os.path.join(output, "footer"), "wb") as footer_file:
                 footer_file.write(self.get_footer())

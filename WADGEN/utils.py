@@ -17,6 +17,15 @@ class Crypto:
     blocksize = 64
 
     @classmethod
+    def decrypt_data(cls, key: bytes, iv: bytes, data: bytes, align_data: bool = True):
+        """Decrypts data (aligns to 64 bytes, if needed)."""
+        if align_data and (len(data) % cls.blocksize) != 0:
+            return AES.new(key, AES.MODE_CBC, iv).decrypt(
+                data + (b"\x00" * (cls.blocksize - (len(data) % cls.blocksize))))
+        else:
+            return AES.new(key, AES.MODE_CBC, iv).decrypt(data)
+
+    @classmethod
     def decrypt_titlekey(cls, commonkey: bytes, iv: bytes, titlekey: bytes) -> bytes:
         """Decrypts title key from the ticket."""
         return AES.new(key=commonkey, mode=AES.MODE_CBC, iv=iv).decrypt(titlekey)

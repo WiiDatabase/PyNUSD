@@ -171,7 +171,7 @@ class Ticket(Base):
         elif ckeyindex == 2:
             return KEY.VWII_KEY.value
         else:
-            print("WARNING: Unknown Common Key, assuming normal key")
+            print("WARNING: Unknown Common Key, assuming normal key.")
             return KEY.COMMON_KEY.value
 
     def get_common_key_index(self) -> int:

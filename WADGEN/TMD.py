@@ -100,9 +100,9 @@ class TMDContent:
     def get_size(self) -> int:
         return self.size
 
-    def get_aligned_size(self) -> int:
+    def get_aligned_size(self, blocksize: int = 64) -> int:
         size = self.get_size()
-        size += utils.align_pointer(size)
+        size += utils.align_pointer(size, blocksize)
         return size
 
     def get_pretty_size(self) -> str:
