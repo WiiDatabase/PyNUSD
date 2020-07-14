@@ -71,11 +71,29 @@ class WAD:
             file.seek(utils.align_pointer(file.tell()), 1)
             ticket = BytesIO(file.read(self.ticket_size))
             self.ticket = Ticket(ticket, has_certificates=False)
+            certchain = []
+            for issuer in reversed(self.get_ticket().get_issuers()):
+                if issuer == "Root":
+                    continue
+                try:
+                    certchain.append(self.get_cert_by_name(issuer))
+                except LookupError:
+                    continue
+            self.get_ticket().set_certificate_chain(certchain)
 
             # TMD
             file.seek(utils.align_pointer(file.tell()), 1)
             tmd = BytesIO(file.read(self.tmd_size))
             self.tmd = TMD(tmd, has_certificates=False)
+            certchain = []
+            for issuer in reversed(self.get_tmd().get_issuers()):
+                if issuer == "Root":
+                    continue
+                try:
+                    certchain.append(self.get_cert_by_name(issuer))
+                except LookupError:
+                    continue
+            self.get_tmd().set_certificate_chain(certchain)
 
             if not self.get_data_size() > 0xFFFFFFFF:
                 expected_data_size = 0
@@ -98,7 +116,7 @@ class WAD:
                 self.footer = None
 
     def dump(self, output) -> str:
-        """Dumps the Ticket to output. Replaces {titleid} and {titleversion} if in path.
+        """Dumps the WAD to output. Replaces {titleid} and {titleversion} if in path.
            Returns the file path.
         """
         output = output.format(titleid=self.tmd.get_titleid(), titleversion=self.tmd.get_titleversion())
@@ -184,8 +202,12 @@ class WAD:
             header_file.write(self.padding)
 
         # Ticket + TMD
-        self.get_ticket().dump(os.path.join(output, "cetk"), include_signature=include_signatures)
-        self.get_tmd().dump(os.path.join(output, "tmd"), include_signature=include_signatures)
+        self.get_ticket().dump(os.path.join(output, "cetk"),
+                               include_signature=include_signatures,
+                               include_certificates=append_certificates)
+        self.get_tmd().dump(os.path.join(output, "tmd"),
+                            include_signature=include_signatures,
+                            include_certificates=append_certificates)
 
         # Certificates
         certchain = b""

@@ -5,7 +5,7 @@ from enum import Enum
 from io import BytesIO
 from typing import Union, Optional, List
 
-from WADGEN import Base, utils, Signature, Certificate, ROOT_KEY, SIGNATURETYPE, PUBLICKEYTYPE
+from WADGEN import Base, utils, Signature, Certificate, ROOT_KEY, SIGNATURETYPE, PUBLICKEYTYPE, RootKey
 from WADGEN.utils import MAXVALUE
 
 
@@ -240,10 +240,10 @@ class TMD(Base):
     def get_signature(self) -> Signature:
         return self.signature
 
-    def get_certificates(self) -> List[Certificate]:
+    def get_certificates(self) -> List[Union[Certificate, RootKey]]:
         return self.certificates
 
-    def get_certificate(self, i: int) -> Certificate:
+    def get_certificate(self, i: int) -> Union[Certificate, RootKey]:
         return self.get_certificates()[i]
 
     def get_issuers(self) -> List[str]:
@@ -253,6 +253,18 @@ class TMD(Base):
            the first one (Root) signs the CA cert.
         """
         return self.issuer.rstrip(b"\00").decode().split("-")
+
+    def get_certificate_chain(self) -> List[Union[Certificate, RootKey]]:
+        """NOTE: Ignores Root Key if it doesn't exist."""
+        certs = []
+        for issuer in reversed(self.get_issuers()):
+            try:
+                certs.append(self.get_cert_by_name(issuer))
+            except LookupError as le:
+                if issuer == "Root":
+                    continue
+                raise le
+        return certs
 
     def is_vwii_title(self) -> bool:
         return self.is_vwii
@@ -380,6 +392,21 @@ class TMD(Base):
 
     def get_signature_hash(self) -> str:
         return utils.Crypto.create_sha1hash_hex(self.pack(include_signature=False))
+
+    def get_data_size(self) -> int:
+        size = 0
+        for content in self.get_contents():
+            size += content.get_size()
+        return size
+
+    def get_pretty_data_size(self) -> str:
+        return utils.convert_size(self.get_data_size())
+
+    def set_certificate_chain(self, certchain: List[Union[Certificate, RootKey]]):
+        for item in certchain:
+            if not isinstance(item, Certificate) and not isinstance(item, RootKey):
+                raise Exception("All items in the list must either be a Certificate or a RootKey.")
+        self.certificates = certchain
 
     def set_titleid(self, tid: str):
         if not isinstance(tid, str):
@@ -525,6 +552,8 @@ class TMD(Base):
             output += "  Requires: {0}\n".format(self.get_required_title())
         if self.get_boot_app():
             output += "  Boot APP: {0}\n".format(self.get_boot_app())
+        output += "  Total data size: {0}\n".format(self.get_pretty_data_size())
+
         output += "\n"
 
         output += "  Number of contents: {0}\n".format(self.get_content_count())
@@ -543,6 +572,29 @@ class TMD(Base):
                 output += " ({0})".format(loader)
             output += "\n"
 
-        # TODO: Certificates + signing stuff here
+        output += "\n  Certificates:\n"
+
+        try:
+            certchain = self.get_certificate_chain()
+        except LookupError:
+            output += "    Could not locate the needed certificates.\n"
+            return output
+
+        for num, cert in enumerate(certchain):
+            output += "    Signed by {0} ({1}): ".format(cert.get_name(), cert.get_key_type())
+            if num == 0:  # First is alwyas the TMD itself
+                output += "[{0}] ".format(self.get_signature_hash())
+                if self.is_fakesigned():
+                    output += "[FAKESIGNED]"
+                else:
+                    if self.has_valid_signature():
+                        output += "[OK]"
+                    else:
+                        output += "[FAIL]"
+                output += "\n"
+            else:
+                signs_this_certificate = certchain[num - 1]
+                output += "[{0}] [{1}]\n".format(signs_this_certificate.get_signature_hash(),
+                                                 "OK" if signs_this_certificate.has_valid_signature(cert) else "FAIL")
 
         return output

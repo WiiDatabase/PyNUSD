@@ -49,6 +49,9 @@ class RootKey(Base):
     def get_signer(self) -> PKCS1_v1_5:
         return PKCS1_v1_5.new(self.get_public_key())
 
+    def get_signature_hash(self) -> str:
+        return Crypto.create_sha1hash_hex(self.pack())
+
     def verify_signature(self, data: bytes, signature: Signature) -> bool:
         if not isinstance(signature, Signature):
             raise Exception("Signature must be of type Signature.")
