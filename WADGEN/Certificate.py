@@ -1,18 +1,71 @@
 import struct
 from enum import Enum
 from io import BytesIO
-from typing import Optional, Union
+from typing import Optional, Union, List
 
+from Crypto.Hash import SHA1
 from Crypto.PublicKey.RSA import construct as rsa_construct, RsaKey
 from Crypto.Signature import PKCS1_v1_5
 
 from WADGEN import Signature, Base, SIGNATURETYPE
+from utils import Crypto
 
 
 class PUBLICKEYTYPE(Enum):
     RSA_4096 = 0
     RSA_2048 = 1
     ECC = 2
+
+
+class RootKey(Base):
+    def __init__(self, f: Union[str, bytes, bytearray, BytesIO, None] = None):
+        self.modulus = b"\x00" * 512
+        self.exponent = 0
+
+        super().__init__(f)
+
+    def parse(self, f: BytesIO):
+        self.modulus = f.read(512)
+        self.exponent = struct.unpack(">I", f.read(4))[0]
+
+    def pack(self) -> bytes:
+        pack = self.modulus
+        pack += struct.pack(">I", self.exponent)
+        return pack
+
+    @staticmethod
+    def get_name() -> str:
+        return "Root"
+
+    @staticmethod
+    def get_key_type() -> str:
+        return "RSA-4096"
+
+    def get_public_key(self) -> RsaKey:
+        return rsa_construct(
+                (int.from_bytes(self.modulus, byteorder="big"), self.exponent)
+        )
+
+    def get_signer(self) -> PKCS1_v1_5:
+        return PKCS1_v1_5.new(self.get_public_key())
+
+    def verify_signature(self, data: bytes, signature: Signature) -> bool:
+        if not isinstance(signature, Signature):
+            raise Exception("Signature must be of type Signature.")
+
+        # Yes, this returns a boolean, don't know why Pycharm thinks otherwise
+        return self.get_signer().verify(SHA1.new(data), signature.get_data())
+
+    def __repr__(self):
+        return "<Nintendo Public Root Key(type='{type}')>".format(
+                type=self.get_key_type()
+        )
+
+    def __str__(self):
+        output = "Nintendo Public Root Key:\n"
+        output += "  {0} ({1})\n".format(self.get_name(), self.get_key_type())
+
+        return output
 
 
 class Certificate:
@@ -75,8 +128,8 @@ class Certificate:
     def get_signature(self) -> Signature:
         return self.signature
 
-    def get_issuer(self) -> str:
-        return self.issuer.rstrip(b"\00").decode().split("-")[-1]
+    def get_issuers(self) -> List[str]:
+        return self.issuer.rstrip(b"\00").decode().split("-")
 
     def get_name(self) -> str:
         return self.name.rstrip(b"\00").decode()
@@ -121,56 +174,35 @@ class Certificate:
         except IndexError:
             return "Unknown key type"
 
+    def get_signature_hash(self) -> str:
+        return Crypto.create_sha1hash_hex(self.pack(include_signature=False))
+
+    def verify_signature(self, data: bytes, signature: Signature) -> bool:
+        if not isinstance(signature, Signature):
+            raise Exception("Signature must be of type Signature.")
+
+        # Yes, this returns a boolean, don't know why Pycharm thinks otherwise
+        return self.get_signer().verify(SHA1.new(data), signature.get_data())
+
+    # See https://stackoverflow.com/a/33533514 on why the type is in quotes
+    def has_valid_signature(self, certificate: Union["Certificate", RootKey]) -> bool:
+        if not isinstance(certificate, Certificate) and not isinstance(certificate, RootKey):
+            raise Exception("Certificate type expected.")
+        return certificate.verify_signature(self.pack(include_signature=False), self.get_signature())
+
     def __len__(self):
         return len(self.pack())
 
     def __repr__(self):
         return "<Certificate(name='{name}', issuer='{issuer}', type='{type}')>".format(
                 name=self.get_name(),
-                issuer=self.get_issuer(),
-                type=self.get_key_type()
-        )
-
-
-class RootKey(Base):
-    def __init__(self, f: Union[str, bytes, bytearray, BytesIO, None] = None):
-        self.modulus = b"\x00" * 512
-        self.exponent = 0
-
-        super().__init__(f)
-
-    def parse(self, f: BytesIO):
-        self.modulus = f.read(512)
-        self.exponent = struct.unpack(">I", f.read(4))[0]
-
-    def pack(self) -> bytes:
-        pack = self.modulus
-        pack += struct.pack(">I", self.exponent)
-        return pack
-
-    @staticmethod
-    def get_name() -> str:
-        return "Root"
-
-    @staticmethod
-    def get_key_type() -> str:
-        return "RSA-4096"
-
-    def get_public_key(self) -> RsaKey:
-        return rsa_construct(
-                (int.from_bytes(self.modulus, byteorder="big"), self.exponent)
-        )
-
-    def get_signer(self) -> PKCS1_v1_5:
-        return PKCS1_v1_5.new(self.get_public_key())
-
-    def __repr__(self):
-        return "<Nintendo Public Root Key(type='{type}')>".format(
+                issuer=self.get_issuers()[-1],
                 type=self.get_key_type()
         )
 
     def __str__(self):
-        output = "Nintendo Public Root Key:\n"
+        output = "Certificate:\n"
         output += "  {0} ({1})\n".format(self.get_name(), self.get_key_type())
+        output += "  Signed by {0} using {1}".format(self.get_issuers()[-1], self.get_signature().get_signature_type())
 
         return output

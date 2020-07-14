@@ -82,6 +82,9 @@ class Signature:
     def zerofill(self):
         self.data = b"\x00" * self.get_signature_data_size()
 
+    def is_zerofilled(self):
+        return self.get_data() == b"\x00" * self.get_signature_data_size()
+
     def pack(self) -> bytes:
         pack = struct.pack(">I", self.type)
         pack += self.get_data()

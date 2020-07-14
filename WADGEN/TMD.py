@@ -359,14 +359,14 @@ class TMD(Base):
         for i, content in enumerate(self.get_contents()):
             if content.get_cid() == cid:
                 return i
-        raise ValueError("CID {0} not found.".format(cid))
+        raise LookupError("CID {0} not found.".format(cid))
 
     def get_content_record_by_cid(self, cid: str) -> TMDContent:
         cid = cid.lower()
         for content in self.get_contents():
             if cid == content.get_cid():
                 return content
-        raise ValueError("CID {0} not found.".format(cid))
+        raise LookupError("CID {0} not found.".format(cid))
 
     def get_cert_by_name(self, name) -> Certificate:
         """Returns certificate by name."""
@@ -376,7 +376,10 @@ class TMD(Base):
         if name == "Root":
             if ROOT_KEY:
                 return ROOT_KEY
-        raise ValueError("Certificate '{0}' not found.".format(name))
+        raise LookupError("Certificate '{0}' not found.".format(name))
+
+    def get_signature_hash(self) -> str:
+        return utils.Crypto.create_sha1hash_hex(self.pack(include_signature=False))
 
     def set_titleid(self, tid: str):
         if not isinstance(tid, str):
@@ -443,6 +446,23 @@ class TMD(Base):
 
         self.unused = oldval
         raise Exception("Fakesigning failed.")
+
+    def is_fakesigned(self) -> bool:
+        if not self.get_signature().is_zerofilled():
+            return False
+
+        sha1hash = utils.Crypto.create_sha1hash_hex(self.pack(include_signature=False))
+        if sha1hash.startswith("00"):
+            return True
+
+        return False
+
+    def has_valid_signature(self) -> bool:
+        if self.is_fakesigned():
+            return False
+
+        certificate = self.get_cert_by_name(self.get_issuers()[-1])
+        return certificate.verify_signature(self.pack(include_signature=False), self.get_signature())
 
     def pack(self, include_signature=True, include_certificates=False) -> bytes:
         pack = b""
