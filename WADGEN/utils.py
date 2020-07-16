@@ -47,7 +47,7 @@ class Crypto:
         return binascii.hexlify(cls.derive_decrypted_titlekey(titleid, password)).decode()
 
     @classmethod
-    def decrypt_data(cls, key: bytes, iv: bytes, data: bytes, align_data: bool = True):
+    def decrypt_data(cls, key: bytes, iv: bytes, data: bytes, align_data: bool = True) -> bytes:
         """Decrypts data (aligns to 64 bytes, if needed)."""
         if align_data and (len(data) % cls.blocksize) != 0:
             return AES.new(key, AES.MODE_CBC, iv).decrypt(

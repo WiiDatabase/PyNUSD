@@ -66,6 +66,8 @@ class Ticket(Base):
         self.permit_mask = struct.unpack(">L", f.read(4))[0]
         self.export_allowed = struct.unpack(">?", f.read(1))[0]
         self.ckeyindex = struct.unpack(">B", f.read(1))[0]
+        if not CKEYTYPE.NORMAL.value <= self.get_common_key_index() <= CKEYTYPE.VWII.value:
+            print("WARNING: Unknown Common-Key, assuming normal key.")
         self.unknown3 = f.read(48)
         self.content_access_permissions = f.read(64)
         self.padding = struct.unpack(">H", f.read(2))[0]
@@ -200,7 +202,6 @@ class Ticket(Base):
         elif ckeyindex == 2:
             return KEY.VWII_KEY.value
         else:
-            print("WARNING: Unknown Common Key, assuming normal key.")
             return KEY.COMMON_KEY.value
 
     def get_common_key_index(self) -> int:

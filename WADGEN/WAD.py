@@ -217,24 +217,29 @@ class WAD:
             cert_file.write(certchain)
 
         # Data
-        # TODO: Fix wrong alignment
         if self.__f:
             with open(self.__f, "rb") as orig_file:
                 orig_file.seek(self.__dataoffset)
                 for content in self.get_tmd().get_contents():
-                    orig_content = orig_file.read(content.get_aligned_size())
+                    content_size = content.get_aligned_size()
+                    # content_size += utils.align_pointer(content_size, 16)
+                    # print("Content {0}: Start Offset: {1}".format(content.get_cid(), orig_file.tell()))
+                    orig_content = orig_file.read(content_size)
                     with open(os.path.join(output, content.get_cid()), "wb") as content_file:
-                        # print("Content {0}: Offset: {1}".format(content.get_cid(), orig_file.tell()))
-                        content_file.write(orig_content)
+                        # print("Content {0}: End Offset: {1}".format(content.get_cid(), orig_file.tell()))
+                        content_file.write(orig_content[:content.get_aligned_size(16)])
 
                     # Optionally decrypt contents
                     if decrypt:
                         with open(os.path.join(output, content.get_cid()) + ".app", "wb") as content_file:
+                            # TODO: Trim file to orig size...
                             decrypted_data = utils.Crypto.decrypt_data(
                                     self.get_ticket().get_decrypted_titlekey(),
                                     content.get_iv(),
                                     orig_content
-                            )
+                            )[:content.get_size()]
+                            # print("Expected Hash: {0}".format(content.get_hash_hex()))
+                            # print("Actual Hash: {0}".format(utils.Crypto.create_sha1hash_hex(decrypted_data)))
                             if utils.Crypto.create_sha1hash_hex(decrypted_data) != content.get_hash_hex():
                                 print("WARNING: SHA1 hash for content {0} does not match.".format(content.get_cid()))
                             content_file.write(decrypted_data)
