@@ -1,9 +1,12 @@
+import binascii
 import hashlib
 import math
 from enum import Enum
 from typing.io import BinaryIO
 
 from Crypto.Cipher import AES
+from Crypto.Hash import SHA1
+from Crypto.Protocol.KDF import PBKDF2
 
 
 class MAXVALUE(Enum):
@@ -15,6 +18,33 @@ class MAXVALUE(Enum):
 class Crypto:
     """"This is a Cryptographic/hash class used to abstract away things."""
     blocksize = 64
+    KEYGEN_SECRET = b"\xfd\x04\x01\x05\x06\x0b\x11\x1c\x2d\x49"
+
+    @classmethod
+    def derive_decrypted_titlekey(cls, titleid: str, password: str) -> bytes:
+        if not isinstance(password, str):
+            raise ValueError("Password must be a string.")
+
+        if not isinstance(titleid, str):
+            raise ValueError("TitleID must be a string.")
+
+        if len(titleid) != 16:
+            raise ValueError("Title ID must be 16 characters long.")
+
+        while titleid[0:2] == "00":
+            titleid = titleid[2:]
+        if titleid == "":
+            raise ValueError("Unexpected TitleID.")
+
+        titleid = binascii.unhexlify(titleid)
+        salt = cls.KEYGEN_SECRET + titleid
+
+        key = PBKDF2(password, cls.create_md5hash(salt), dkLen=16, count=20, hmac_hash_module=SHA1)
+        return key
+
+    @classmethod
+    def derive_decrypted_titlekey_hex(cls, titleid: str, password: str) -> str:
+        return binascii.hexlify(cls.derive_decrypted_titlekey(titleid, password)).decode()
 
     @classmethod
     def decrypt_data(cls, key: bytes, iv: bytes, data: bytes, align_data: bool = True):
