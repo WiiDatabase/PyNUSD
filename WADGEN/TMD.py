@@ -5,8 +5,13 @@ from enum import Enum
 from io import BytesIO
 from typing import Union, Optional, List
 
+from Crypto.Hash import SHA1
+from Crypto.Protocol.KDF import PBKDF2
+
 from WADGEN import Base, utils, Signature, Certificate, ROOT_KEY, SIGNATURETYPE, PUBLICKEYTYPE, RootKey
 from WADGEN.utils import MAXVALUE
+
+KEYGEN_SECRET = b"\xfd\x04\x01\x05\x06\x0b\x11\x1c\x2d\x49"
 
 
 class CONTENTTYPE(Enum):
@@ -401,6 +406,25 @@ class TMD(Base):
 
     def get_pretty_data_size(self) -> str:
         return utils.convert_size(self.get_data_size())
+
+    def derive_decrypted_titlekey(self, password: str) -> bytes:
+        if not isinstance(password, str):
+            raise ValueError("Password must be a string.")
+
+        titleid = self.get_titleid()
+        while titleid[0:2] == "00":
+            titleid = titleid[2:]
+        if titleid == "":
+            raise ValueError("Unexpected TitleID.")
+
+        titleid = binascii.unhexlify(titleid)
+        salt = KEYGEN_SECRET + titleid
+
+        key = PBKDF2(password, utils.Crypto.create_md5hash(salt), dkLen=16, count=20, hmac_hash_module=SHA1)
+        return key
+
+    def derive_decrypted_titlekey_hex(self, password: str) -> str:
+        return binascii.hexlify(self.derive_decrypted_titlekey(password)).decode()
 
     def set_certificate_chain(self, certchain: List[Union[Certificate, RootKey]]):
         for item in certchain:

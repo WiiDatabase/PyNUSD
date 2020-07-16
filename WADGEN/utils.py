@@ -21,7 +21,7 @@ class Crypto:
         """Decrypts data (aligns to 64 bytes, if needed)."""
         if align_data and (len(data) % cls.blocksize) != 0:
             return AES.new(key, AES.MODE_CBC, iv).decrypt(
-                data + (b"\x00" * (cls.blocksize - (len(data) % cls.blocksize))))
+                    data + (b"\x00" * (cls.blocksize - (len(data) % cls.blocksize))))
         else:
             return AES.new(key, AES.MODE_CBC, iv).decrypt(data)
 
@@ -36,11 +36,19 @@ class Crypto:
         return AES.new(key=commonkey, mode=AES.MODE_CBC, iv=iv).encrypt(titlekey)
 
     @classmethod
-    def create_sha1hash_hex(cls, data) -> str:
+    def create_md5hash_hex(cls, data: bytes) -> str:
+        return hashlib.md5(data).hexdigest()
+
+    @classmethod
+    def create_md5hash(cls, data: bytes) -> bytes:
+        return hashlib.md5(data).digest()
+
+    @classmethod
+    def create_sha1hash_hex(cls, data: bytes) -> str:
         return hashlib.sha1(data).hexdigest()
 
     @classmethod
-    def create_sha1hash(cls, data) -> bytes:
+    def create_sha1hash(cls, data: bytes) -> bytes:
         return hashlib.sha1(data).digest()
 
 
@@ -73,7 +81,6 @@ def align(value: int, blocksize: int = 64):
         return b"\x00" * (64 - (value % 64))
     else:
         return b""
-
 
 
 def align_pointer(value: int, block: int = 64) -> int:
