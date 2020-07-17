@@ -2,7 +2,7 @@ import os
 import struct
 from enum import Enum
 from io import BytesIO
-from typing import Union, List
+from typing import Union, List, Optional
 
 from WADGEN import Certificate, Ticket, utils, TMD, ROOT_KEY
 
@@ -119,7 +119,7 @@ class WAD:
         """Dumps the WAD to output. Replaces {titleid} and {titleversion} if in path.
            Returns the file path.
         """
-        output = output.format(titleid=self.tmd.get_titleid(), titleversion=self.tmd.get_titleversion())
+        output = output.format(titleid=self.get_tmd().get_titleid(), titleversion=self.get_tmd().get_titleversion())
         with open(output, "wb") as file:
             # Header
             file.write(struct.pack(">L", self.get_header_size()))
@@ -172,18 +172,58 @@ class WAD:
 
         return output
 
+    def unpack_content(self,
+                       cid: str,
+                       output: Optional[str] = None,
+                       decrypt: bool = True):
+        content = self.get_tmd().get_content_record_by_cid(cid)
+        if output:
+            output = output.format(titleid=self.get_tmd().get_titleid(), titleversion=self.get_tmd().get_titleversion())
+        else:
+            output = os.path.join("extracted_wads", self.get_tmd().get_titleid(),
+                                  str(self.get_tmd().get_titleversion()))
+
+        if not os.path.isdir(output):
+            os.makedirs(output)
+
+        if not self.__f:
+            raise Exception("Content can only be unpacked if WAD is opened from a file.")
+
+        with open(self.__f, "rb") as orig_file:
+            # Jump to content
+            orig_file.seek(self.__dataoffset)
+            for i in range(content.get_index()):
+                orig_file.seek(self.get_tmd().get_content(i).get_aligned_size(), 1)
+            orig_content = orig_file.read(content.get_aligned_size())
+            with open(os.path.join(output, content.get_cid()), "wb") as content_file:
+                content_file.write(orig_content[:content.get_aligned_size(16)])
+
+                decrypted_data = utils.Crypto.decrypt_data(
+                        self.get_ticket().get_decrypted_titlekey(),
+                        content.get_iv(),
+                        orig_content
+                )[:content.get_size()]
+                if utils.Crypto.create_sha1hash_hex(decrypted_data) != content.get_hash_hex():
+                    print("WARNING: SHA1 hash for content {0} does not match.".format(content.get_cid()))
+
+            # Optionally save decrypted contents
+            if decrypt:
+                with open(os.path.join(output, content.get_cid()) + ".app", "wb") as content_file:
+                    content_file.write(decrypted_data)
+
     def unpack(self,
-               output=None,
-               decrypt=True,
-               include_signatures=True,
-               append_certificates=True):
+               output: Optional[str] = None,
+               decrypt: bool = True,
+               include_signatures: bool = True,
+               append_certificates: bool = True):
         """Extracts WAD to output. Replaces {titleid} and {titleversion} if in folder name.
            Extracts to "extracted_wads/TITLEID/TITLEVER" if no output is given.
        """
         if output:
-            output = output.format(titleid=self.tmd.get_titleid(), titleversion=self.tmd.get_titleversion())
+            output = output.format(titleid=self.get_tmd().get_titleid(), titleversion=self.get_tmd().get_titleversion())
         else:
-            output = os.path.join("extracted_wads", self.tmd.get_titleid(), str(self.tmd.get_titleversion()))
+            output = os.path.join("extracted_wads", self.get_tmd().get_titleid(),
+                                  str(self.get_tmd().get_titleversion()))
 
         if not os.path.isdir(output):
             os.makedirs(output)
@@ -221,8 +261,7 @@ class WAD:
             with open(self.__f, "rb") as orig_file:
                 orig_file.seek(self.__dataoffset)
                 for content in self.get_tmd().get_contents():
-                    content_size = content.get_aligned_size()
-                    orig_content = orig_file.read(content_size)
+                    orig_content = orig_file.read(content.get_aligned_size())
                     with open(os.path.join(output, content.get_cid()), "wb") as content_file:
                         content_file.write(orig_content[:content.get_aligned_size(16)])
 
@@ -310,7 +349,7 @@ class WAD:
         )
 
     def __str__(self):
-        output = str(self.tmd) + "\n"
-        output += str(self.ticket)
+        output = str(self.get_tmd()) + "\n"
+        output += str(self.get_ticket())
 
         return output
