@@ -95,11 +95,8 @@ class WAD:
                     continue
             self.get_tmd().set_certificate_chain(certchain)
 
-            if not self.get_data_size() > 0xFFFFFFFF:
-                expected_data_size = 0
-                for content in self.get_tmd().get_contents():
-                    expected_data_size += content.get_aligned_size()
-                if expected_data_size != self.get_data_size():
+            if self.get_data_size() < 0xFFFFFFFF:
+                if self.get_tmd().get_aligned_data_size() != self.get_data_size():
                     print("WARNING: Data size in header does not match real data size.")
 
             # Contents would start here
@@ -239,7 +236,6 @@ class WAD:
             header_file.write(struct.pack(">L", self.get_tmd_size()))
             header_file.write(struct.pack(">L", self.get_data_size()))
             header_file.write(struct.pack(">L", self.get_footer_size()))
-            header_file.write(self.padding)
 
         # Ticket + TMD
         self.get_ticket().dump(os.path.join(output, "cetk"),

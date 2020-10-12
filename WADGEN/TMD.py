@@ -399,6 +399,12 @@ class TMD(Base):
             size += content.get_size()
         return size
 
+    def get_aligned_data_size(self) -> int:
+        size = 0
+        for content in self.get_contents():
+            size += content.get_aligned_size()
+        return size
+
     def get_pretty_data_size(self) -> str:
         return utils.convert_size(self.get_data_size())
 
