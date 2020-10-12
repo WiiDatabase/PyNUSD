@@ -13,3 +13,4 @@ else:
 from .TMD import *
 from .Ticket import *
 from .WAD import *
+from .WADMaker import *
